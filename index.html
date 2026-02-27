@@ -425,11 +425,7 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
     <div class="sb-logo-sub">Management System v3</div>
   </div>
   <div class="sb-month">
-    <select id="monthSel" onchange="changeMonth(this.value)">
-      <option value="2026/01" selected>2026年 1月</option>
-      <option value="2025/12">2025年 12月</option>
-      <option value="2025/11">2025年 11月</option>
-    </select>
+    <select id="monthSel" onchange="changeMonth(this.value)"></select>
   </div>
   <nav class="sb-nav">
     <div class="sb-section">メイン</div>
@@ -1536,7 +1532,20 @@ function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('overlayBg').classList.remove('show');
 }
-function changeMonth(v) { showToast('📅 '+v+' のデータを表示'); }
+function changeMonth(v) {
+  // 右上バッジを更新
+  const badge = document.getElementById('tbBadge');
+  if(badge && v) {
+    const parts = v.split('/');
+    badge.textContent = parts[0]+'年'+parseInt(parts[1])+'月';
+  }
+  showToast('📅 '+v.replace('/',' 年').replace(/(\d+)$/,(m)=>parseInt(m)+'月')+' のデータを表示');
+  // 各ページを再描画
+  if(curPage==='dash')    renderDash?.();
+  if(curPage==='sales')   renderSales();
+  if(curPage==='shiire')  renderShiire();
+  if(curPage==='monthly') renderMonthly?.();
+}
 
 // ════════════════════════════════════════════════════════════════════════
 // DASHBOARD
@@ -2804,8 +2813,11 @@ function importLocalData(input) {
   if(!sel)return;
   const now=new Date();
   sel.innerHTML='';
-  for(let i=0;i<12;i++){
+  // アプリ開始月（2026年2月）より前は表示しない
+  const startYear=2026, startMonth=2;
+  for(let i=0;i<6;i++){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    if(d.getFullYear()<startYear||(d.getFullYear()===startYear&&d.getMonth()+1<startMonth)) break;
     const val=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`;
     const opt=document.createElement('option');
     opt.value=val;opt.textContent=`${d.getFullYear()}年${d.getMonth()+1}月`;
@@ -2817,6 +2829,15 @@ function importLocalData(input) {
 updateSyncStatus();
 updateApiKeyStatus();
 updateTanaMonthLabel();
+// 右上バッジを初期化
+(function(){
+  const sel=document.getElementById('monthSel');
+  const badge=document.getElementById('tbBadge');
+  if(sel&&badge&&sel.value){
+    const parts=sel.value.split('/');
+    badge.textContent=parts[0]+'年'+parseInt(parts[1])+'月';
+  }
+})();
 nav('dash');
 
 </script>
