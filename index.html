@@ -1854,10 +1854,10 @@ function renderTanaContent(idx) {
 }
 function itemCardHTML(item) {
   const s=stocks[item.id];
-  const hasVal=s!==undefined;
+  const hasVal = s !== undefined && s.stock !== undefined && s.stock !== null && s.stock !== '';
   const prevStock = (s && s.prevStock !== undefined) ? s.prevStock : null;
-  const stockVal=hasVal?s.stock:'';
-  const priceVal=(hasVal&&s.price!==undefined)?s.price:item.price;
+  const stockVal = hasVal ? s.stock : '';
+  const priceVal = (s && s.price !== undefined) ? s.price : item.price;
   const diff=item.price-item.prevPrice;
   const isOpen=openCard===item.id;
   const amount=hasVal?calcItemAmount(item,s.stock):0;
@@ -1881,7 +1881,7 @@ function itemCardHTML(item) {
           <div class="istock-col">
             ${prevStock!==null?'<div class="istock-col-lbl">当月</div>':''}
             <div class="istock">${hasVal?s.stock:'−'}</div>
-            <div class="iunit">${item.unit}</div>
+            <div class="iunit">${tanaDisplayUnit(item)}</div>
           </div>
         </div>
         ${hasVal?`<div class="iamt">${yen(amount)}</div>`:''}
@@ -1898,7 +1898,7 @@ function itemCardHTML(item) {
         </div>
       </div>
       <div class="inp-row"><div class="inp-lbl">仕入単価</div><input class="price-inp-s" type="number" id="pi-${item.id}" value="${priceVal}" step="1" oninput="onPriceIn('${item.id}',this.value)" inputmode="numeric"></div>
-      <div class="inp-row"><div class="inp-lbl">単位</div><input class="unit-inp-s" type="text" id="ui-${item.id}" value="${item.unit}" onchange="onUnitChange('${item.id}',this.value)"></div>
+      <div class="inp-row"><div class="inp-lbl">単位</div><input class="unit-inp-s" type="text" id="ui-${item.id}" value="${tanaDisplayUnit(item)}" onchange="onUnitChange('${item.id}',this.value)"></div>
       <div class="inp-subtotal"><div class="sub-lbl">小計</div><div class="sub-val" id="sub-${item.id}">${hasVal?yen(amount):'¥0'}</div></div>
     </div>
   </div>`;
@@ -2736,8 +2736,15 @@ function renderMaster(q='') {
     const u=item.qty?item.price/item.qty:null;
     const t=item.unitLabel||(item.tanaUnit&&item.qty?item.tanaUnit:item.unit);
     const upStr=u!==null?'¥'+(u<1?u.toFixed(3):u<10?u.toFixed(2):u<100?u.toFixed(1):Math.round(u).toLocaleString())+'/'+t:'-';
-    return `<tr>
-      <td style="font-weight:500">${item.name}${u!==null?`<span class="m-card-unit-price-sp">${upStr}</span>`:''}</td>
+    return `<tr draggable="true" data-id="${item.id}"
+        ondragstart="masterDragStart(event,'${item.id}')"
+        ondragover="masterDragOver(event)"
+        ondrop="masterDrop(event,'${item.id}')"
+        ondragend="masterDragEnd(event)"
+        style="cursor:grab">
+      <td style="font-weight:500">
+        <span style="color:var(--text3);margin-right:6px;cursor:grab;font-size:14px">⠿</span>${item.name}${u!==null?`<span class="m-card-unit-price-sp">${upStr}</span>`:''}
+      </td>
       <td class="r" style="font-family:'DM Mono',monospace">¥${item.price.toLocaleString()}</td>
       <td class="r pc-only" style="font-family:'DM Mono',monospace;color:var(--accent2);font-weight:500">${upStr}</td>
       <td class="pc-only" style="font-family:'DM Mono',monospace;color:var(--text3)">${item.unit}</td>
@@ -2751,6 +2758,47 @@ function renderMaster(q='') {
   }).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">品目がありません</td></tr>';
 }
 function switchMasterTab(idx){masterSheetIdx=idx;renderMaster();}
+
+// ── 品目マスタ ドラッグ＆ドロップ並べ替え ──────────────────────
+let _dragId = null;
+
+function masterDragStart(e, id) {
+  _dragId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.style.opacity = '0.4';
+}
+
+function masterDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  // ドロップ先をハイライト
+  const tr = e.currentTarget;
+  tr.style.borderTop = '2px solid var(--accent)';
+}
+
+function masterDrop(e, targetId) {
+  e.preventDefault();
+  if(!_dragId || _dragId === targetId) return;
+  const sh = SHEETS[masterSheetIdx];
+  const fromIdx = sh.items.findIndex(i => i.id === _dragId);
+  const toIdx   = sh.items.findIndex(i => i.id === targetId);
+  if(fromIdx < 0 || toIdx < 0) return;
+  // 並べ替え
+  const [moved] = sh.items.splice(fromIdx, 1);
+  sh.items.splice(toIdx, 0, moved);
+  saveLS('ls_sheets', SHEETS);
+  renderMaster();
+  showToast('✓ 並べ替えました');
+}
+
+function masterDragEnd(e) {
+  _dragId = null;
+  // スタイルリセット
+  document.querySelectorAll('#masterTable tr').forEach(tr => {
+    tr.style.opacity = '';
+    tr.style.borderTop = '';
+  });
+}
 function filterMaster(q){renderMaster(q);}
 function openAddModal(){editItemId=null;document.getElementById('modalTitle').textContent='品目追加';['m-name','m-unit','m-price','m-qty','m-tana-unit','m-unit-label'].forEach(id=>document.getElementById(id).value='');document.getElementById('m-sheet').value=masterSheetIdx;document.getElementById('modalOverlay').classList.add('open');}
 function openEditModal(id){editItemId=id;const item=findItem(id);if(!item)return;const shIdx=SHEETS.findIndex(sh=>sh.items.some(i=>i.id===id));document.getElementById('modalTitle').textContent='品目編集';document.getElementById('m-name').value=item.name;document.getElementById('m-sheet').value=shIdx;document.getElementById('m-unit').value=item.unit;document.getElementById('m-price').value=item.price;document.getElementById('m-qty').value=item.qty||'';document.getElementById('m-tana-unit').value=item.tanaUnit||'';document.getElementById('m-unit-label').value=item.unitLabel||'';document.getElementById('modalOverlay').classList.add('open');}
