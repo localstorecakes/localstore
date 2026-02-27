@@ -1829,7 +1829,7 @@ function delShiire(idx) { shiireData.splice(idx,1); saveLS('ls_shiire',shiireDat
 function renderTana() { renderTanaTabs(); showTanaTab(curTanaTab); updateProgress(); updateTanaMonthLabel(); }
 function renderTanaTabs() {
   document.getElementById('tanaTabs').innerHTML=SHEETS.map((sh,i)=>{
-    const filled=sh.items.filter(it=>stocks[it.id]!==undefined).length;
+    const filled=sh.items.filter(it=>hasStock(it.id)).length;
     const done=filled===sh.items.length&&sh.items.length>0;
     return `<div class="ttab ${i===curTanaTab?'active':''}" id="ttab-${i}" onclick="showTanaTab(${i})">${sh.name}<span class="tc">${filled}/${sh.items.length}</span>${done?'<span class="tdone">✓</span>':''}</div>`;
   }).join('');
@@ -1843,7 +1843,7 @@ function showTanaTab(idx) {
 function renderTanaContent(idx) {
   const sh=SHEETS[idx];
   const changes=sh.items.filter(i=>i.price!==i.prevPrice);
-  const filled=sh.items.filter(i=>stocks[i.id]!==undefined).length;
+  const filled=sh.items.filter(i=>hasStock(i.id)).length;
   const total=calcSheetTotal(idx);
   let html='';
   if(changes.length>0) html+=`<div class="price-banner">⚠️ 単価変動 <strong>${changes.length}件</strong></div>`;
@@ -1950,8 +1950,9 @@ function tanaDisplayUnit(item) {
 
 function calcSheetTotal(idx){return SHEETS[idx].items.reduce((s,item)=>{const st=stocks[item.id];return s+(st&&st.stock!==undefined?calcItemAmount(item,st.stock):0);},0);}
 function calcGrandTotal(){return SHEETS.reduce((s,_,i)=>s+calcSheetTotal(i),0);}
-function updateProgress(){let total=0,filled=0;SHEETS.forEach(sh=>{total+=sh.items.length;filled+=sh.items.filter(i=>stocks[i.id]!==undefined).length;});const pct=total>0?Math.round(filled/total*100):0;document.getElementById('progText').textContent=`${filled} / ${total} 品`;document.getElementById('progPct').textContent=pct+'%';document.getElementById('progFill').style.width=pct+'%';}
-function updateTanaTabCounts(){SHEETS.forEach((sh,i)=>{const filled=sh.items.filter(item=>stocks[item.id]!==undefined).length;const tab=document.getElementById('ttab-'+i);if(!tab)return;const tc=tab.querySelector('.tc');if(tc)tc.textContent=`${filled}/${sh.items.length}`;const done=filled===sh.items.length&&sh.items.length>0;const td=tab.querySelector('.tdone');if(done&&!td)tab.insertAdjacentHTML('beforeend','<span class="tdone">✓</span>');else if(!done&&td)td.remove();});}
+function hasStock(id){const s=stocks[id];return s!==undefined&&s.stock!==undefined&&s.stock!==null&&s.stock!=='';}
+function updateProgress(){let total=0,filled=0;SHEETS.forEach(sh=>{total+=sh.items.length;filled+=sh.items.filter(i=>hasStock(i.id)).length;});const pct=total>0?Math.round(filled/total*100):0;document.getElementById('progText').textContent=`${filled} / ${total} 品`;document.getElementById('progPct').textContent=pct+'%';document.getElementById('progFill').style.width=pct+'%';}
+function updateTanaTabCounts(){SHEETS.forEach((sh,i)=>{const filled=sh.items.filter(item=>hasStock(item.id)).length;const tab=document.getElementById('ttab-'+i);if(!tab)return;const tc=tab.querySelector('.tc');if(tc)tc.textContent=`${filled}/${sh.items.length}`;const done=filled===sh.items.length&&sh.items.length>0;const td=tab.querySelector('.tdone');if(done&&!td)tab.insertAdjacentHTML('beforeend','<span class="tdone">✓</span>');else if(!done&&td)td.remove();});}
 
 // ── 月末確定・期首引継ぎ ──────────────────────────────────────
 
