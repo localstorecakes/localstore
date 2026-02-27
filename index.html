@@ -1,0 +1,2813 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>LOCAL STORE 経営管理</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&family=Shippori+Mincho:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f2efe9;--bg2:#e8e4db;--bg3:#ddd9ce;--card:#ffffff;
+  --border:#d4cfc3;--border2:#c2bcb0;
+  --accent:#4a6e3c;--accent2:#38582c;--accent-l:#e3eedf;--accent-p:#f0f6ed;
+  --text:#211e17;--text2:#5f5848;--text3:#978e7c;
+  --red:#b04030;--red-l:#fdf0ee;--blue:#2e6080;--blue-l:#e5f0f8;
+  --sat:#5a4090;--sat-l:#f0ecff;--yellow:#b88a08;--yellow-l:#fdf7e2;
+  --purple:#604898;--purple-l:#f0ecff;
+  --shadow:0 2px 14px rgba(0,0,0,.07);--shadow-lg:0 8px 40px rgba(0,0,0,.12);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;font-weight:400;min-height:100vh;overflow-x:hidden}
+
+/* ── LAYOUT ── */
+.sidebar{width:210px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:200;transition:transform .25s ease}
+.main{margin-left:210px;min-height:100vh;display:flex;flex-direction:column}
+.overlay-bg{display:none;position:fixed;inset:0;background:rgba(33,30,23,.35);z-index:190}
+.overlay-bg.show{display:block}
+
+/* ── SIDEBAR ── */
+.sb-logo{padding:22px 18px 16px;border-bottom:1px solid var(--border)}
+.sb-logo-name{font-family:'Shippori Mincho',serif;font-size:14px;font-weight:800;color:var(--text);letter-spacing:.1em;line-height:1.5}
+.sb-logo-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.2em;margin-top:3px;text-transform:uppercase}
+.sb-month{padding:10px 18px;border-bottom:1px solid var(--border)}
+.sb-month select{width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:11px;padding:5px 8px;border-radius:6px;cursor:pointer;outline:none}
+.sb-nav{flex:1;overflow-y:auto;padding:10px 0}
+.sb-section{font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.2em;text-transform:uppercase;padding:10px 18px 4px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:9px 18px;cursor:pointer;font-size:13px;color:var(--text2);border-left:2px solid transparent;transition:all .12s}
+.sb-item:hover{background:var(--bg2);color:var(--text)}
+.sb-item.active{border-left-color:var(--accent);background:var(--accent-p);color:var(--accent);font-weight:500}
+.sb-item .ni{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+.sb-footer{padding:14px 18px;border-top:1px solid var(--border)}
+.sb-cta{width:100%;padding:9px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:'Noto Sans JP',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:background .14s}
+.sb-cta:active{background:var(--accent2)}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;height:52px;gap:12px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
+.menu-btn{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);padding:4px 6px;border-radius:6px}
+.topbar-title{font-family:'Shippori Mincho',serif;font-size:18px;font-weight:600;color:var(--text);letter-spacing:.06em;flex:1}
+.tb-badge{font-family:'DM Mono',monospace;font-size:10px;padding:3px 10px;border-radius:20px;background:var(--accent-l);color:var(--accent2);border:1px solid rgba(74,110,60,.2)}
+
+/* ── PAGE ── */
+.page{display:none;padding:24px;animation:fadeUp .18s ease}
+.page.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.sec-title{font-family:'Shippori Mincho',serif;font-size:15px;font-weight:600;color:var(--text);letter-spacing:.07em;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.s-badge{font-family:'DM Mono',monospace;font-size:9px;padding:2px 8px;background:var(--bg2);border:1px solid var(--border2);color:var(--text3);border-radius:20px;letter-spacing:.1em}
+
+/* ── CARDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+.card-title{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:14px}
+
+/* ── KPI ── */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 16px;box-shadow:var(--shadow);border-top:3px solid transparent}
+.kpi.k-green{border-top-color:var(--accent)}.kpi.k-blue{border-top-color:var(--blue)}
+.kpi.k-red{border-top-color:var(--red)}.kpi.k-yellow{border-top-color:var(--yellow)}.kpi.k-purple{border-top-color:var(--sat)}
+.kpi-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px}
+.kpi-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:var(--text);line-height:1.1}
+.kpi-val.green{color:var(--accent)}.kpi-val.red{color:var(--red)}
+.kpi-sub{font-size:10px;color:var(--text3);margin-top:5px}
+.kpi-chg{font-family:'DM Mono',monospace;font-size:10px;margin-top:3px}
+.kpi-chg.up{color:var(--red)}.kpi-chg.dn{color:var(--blue)}
+
+/* ── GRID ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.grid-3{display:grid;grid-template-columns:3fr 2fr;gap:16px;margin-bottom:16px}
+.grid-4{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
+
+/* ── BAR CHART ── */
+.bar-chart{display:flex;align-items:flex-end;gap:0;height:120px;border-bottom:1px solid var(--border)}
+.day-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer;position:relative}
+.day-col:hover .day-tip{display:block}
+.day-bar-b{width:78%;border-radius:3px 3px 0 0;min-height:2px;transition:opacity .15s}
+.day-col:hover .day-bar-b{opacity:.75}
+.day-bar-b.weekday{background:var(--blue)}.day-bar-b.saturday{background:var(--sat)}.day-bar-b.sunday{background:var(--red)}.day-bar-b.closed{background:var(--bg3)}
+.day-lbl-b{font-family:'DM Mono',monospace;font-size:8px;margin-top:3px}
+.day-lbl-b.sat{color:var(--sat)}.day-lbl-b.sun{color:var(--red)}.day-lbl-b.wk{color:var(--text3)}
+.day-tip{display:none;position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:var(--text);color:#fff;font-size:10px;padding:4px 8px;border-radius:6px;white-space:nowrap;z-index:10;font-family:'DM Mono',monospace;pointer-events:none}
+.day-tip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--text)}
+.legend-row{display:flex;gap:12px;margin-top:8px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3)}
+.leg-dot{width:8px;height:8px;border-radius:2px}
+
+/* ── DOW GRID ── */
+.dow-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.dow-lbl{font-family:'DM Mono',monospace;font-size:11px;width:18px;text-align:right;flex-shrink:0}
+.dow-lbl.sat{color:var(--sat)}.dow-lbl.sun{color:var(--red)}
+.dow-bar-w{flex:1;height:22px;background:var(--bg2);border-radius:4px;overflow:hidden}
+.dow-bar-f{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,.9);font-weight:500;transition:width .6s ease;white-space:nowrap;min-width:0}
+.dow-cnt{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;flex-shrink:0}
+
+/* ── MONTHLY TREND (mini) ── */
+.trend-bars{display:flex;align-items:flex-end;gap:5px;height:80px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.t-grp{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
+.t-inner{width:100%;display:flex;gap:2px;align-items:flex-end;height:68px}
+.t-bar{flex:1;border-radius:2px 2px 0 0;min-height:2px}
+.t-bar.bs{background:var(--blue)}.t-bar.bc{background:var(--red)}.t-bar.bp{background:var(--accent)}
+.t-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);margin-top:3px}
+
+/* ── TABLE ── */
+.tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{padding:9px 13px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);background:var(--bg2);font-weight:400}
+thead th.r{text-align:right}
+tbody td{padding:10px 13px;border-bottom:1px solid rgba(212,207,195,.4);color:var(--text2)}
+tbody td.r{text-align:right;font-family:'DM Mono',monospace;font-size:11px;color:var(--text)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:rgba(0,0,0,.015)}
+tfoot td{padding:10px 13px;background:var(--bg2);font-weight:700;color:var(--text);font-family:'DM Mono',monospace;font-size:11px}
+tfoot td.r{text-align:right}
+.tag{display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-family:'DM Mono',monospace}
+.t-food{background:var(--accent-l);color:var(--accent2);border:1px solid rgba(74,110,60,.2)}
+.t-pack{background:var(--blue-l);color:var(--blue);border:1px solid rgba(46,96,128,.2)}
+.t-fixed{background:var(--yellow-l);color:var(--yellow);border:1px solid rgba(184,138,8,.2)}
+.t-salary{background:var(--purple-l);color:var(--purple);border:1px solid rgba(96,72,152,.2)}
+.t-sale{background:#e8f8f0;color:#1a7a4a;border:1px solid #b0e0c8}
+.t-card{background:var(--red-l);color:var(--red);border:1px solid rgba(176,64,48,.2)}
+.t-unk{background:var(--bg2);color:var(--text3);border:1px solid var(--border2)}
+
+/* ── BUTTONS ── */
+.btn{padding:9px 20px;border-radius:9px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;transition:all .14s;display:inline-flex;align-items:center;gap:7px;border:none}
+.btn-primary{background:var(--accent);color:#fff;font-weight:700}
+.btn-primary:hover{background:var(--accent2)}
+.btn-primary:active{transform:scale(.98)}
+.btn-primary:disabled{background:var(--text3);cursor:not-allowed}
+.btn-sec{background:var(--card);color:var(--text2);border:1px solid var(--border2) !important}
+.btn-sec:hover{border-color:var(--accent) !important;color:var(--accent)}
+.btn-danger{background:var(--red-l);color:var(--red);border:1px solid rgba(176,64,48,.25) !important}
+.btn-sm{padding:5px 11px;font-size:11px;border-radius:6px}
+
+/* ── FORMS ── */
+.form-grid{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:10px;align-items:end;margin-bottom:10px}
+.form-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg label{font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase}
+.fi{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;color:var(--text);width:100%;outline:none;transition:border-color .15s}
+.fi:focus{border-color:var(--accent);background:var(--card)}
+.fi::placeholder{color:var(--text3)}
+
+/* ── TANA ── */
+.tana-sticky{background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:52px;z-index:90;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.tana-inner{display:flex;align-items:center;height:42px;padding:0 16px;gap:10px}
+.prog-wrap{padding:0 16px 8px;background:var(--card)}
+.prog-labels{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-bottom:4px}
+.prog-bar{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s ease}
+.tana-tabs-wrap{overflow-x:auto;background:var(--card);border-bottom:2px solid var(--border);scrollbar-width:none}
+.tana-tabs-wrap::-webkit-scrollbar{display:none}
+.tana-tabs{display:flex;padding:0 10px;gap:2px;white-space:nowrap}
+.ttab{padding:10px 14px;font-size:12px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .12s;display:flex;align-items:center;gap:5px}
+.ttab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+.ttab .tc{font-family:'DM Mono',monospace;font-size:10px;background:var(--bg2);padding:1px 6px;border-radius:20px;color:var(--text3)}
+.ttab.active .tc{background:var(--accent-l);color:var(--accent2)}
+.ttab .tdone{font-size:11px;color:var(--accent)}
+.tana-content{padding:12px 16px}
+.ts-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.ts-label{font-size:11px;color:var(--text3);margin-bottom:2px}
+.ts-val{font-family:'DM Mono',monospace;font-size:19px;font-weight:500;color:var(--accent2)}
+.ts-cnt{font-size:12px;color:var(--text3)}
+.ts-cnt span{color:var(--accent);font-weight:700}
+.srch-wrap{position:relative;margin-bottom:10px}
+.srch-ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text3)}
+.srch-inp{width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 10px 9px 33px;font-size:14px;font-family:'Noto Sans JP',sans-serif;color:var(--text);outline:none;transition:border-color .18s}
+.srch-inp:focus{border-color:var(--accent)}
+.srch-inp::placeholder{color:var(--text3)}
+.price-banner{background:var(--yellow-l);border:1px solid #f0d070;border-radius:10px;padding:9px 13px;margin-bottom:10px;display:flex;align-items:center;gap:9px;font-size:12px;color:#7a5a0a}
+.item-card{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:7px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:border-color .12s}
+.item-card.has-val{border-color:var(--accent);box-shadow:0 1px 8px rgba(74,110,60,.1)}
+.item-card.price-chg{border-color:var(--yellow)}
+.item-main{display:flex;align-items:center;padding:11px 13px;gap:11px;cursor:pointer}
+.ichk{width:24px;height:24px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .12s;color:transparent}
+.item-card.has-val .ichk{background:var(--accent);border-color:var(--accent);color:#fff}
+.iinfo{flex:1;min-width:0}
+.iname{font-size:14px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.imeta{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text3);flex-wrap:wrap}
+.ipricemono{font-family:'DM Mono',monospace}
+.up-badge{background:#fef3f0;color:var(--red);border:1px solid #f5c8c0;font-size:10px;padding:1px 6px;border-radius:20px;font-family:'DM Mono',monospace}
+.dn-badge{background:var(--blue-l);color:var(--blue);border:1px solid #c0d8e8;font-size:10px;padding:1px 6px;border-radius:20px;font-family:'DM Mono',monospace}
+.iright{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0}
+.istock-cols{display:flex;gap:10px;align-items:flex-end}
+.istock-col{display:flex;flex-direction:column;align-items:center;gap:1px}
+.istock-col-lbl{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:.05em}
+.istock{font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:var(--text3);line-height:1}
+.istock.is-prev{font-size:16px;color:var(--text3)}
+.item-card.has-val .istock{color:var(--accent)}
+.istock-divider{width:1px;height:28px;background:var(--border);align-self:center}
+.iunit{font-size:10px;color:var(--text3);text-align:center}
+.iamt{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)}
+.item-card.has-val .iamt{color:var(--accent2)}
+.input-panel{display:none;background:var(--accent-p);border-top:1px solid var(--border);padding:13px}
+.item-card.open .input-panel{display:block}
+.quick-nums{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.qn{padding:6px 13px;background:var(--card);border:1px solid var(--border2);border-radius:20px;font-family:'DM Mono',monospace;font-size:13px;color:var(--text2);cursor:pointer;transition:all .1s}
+.qn:active{background:var(--accent-l);border-color:var(--accent);color:var(--accent2)}
+.inp-row{display:flex;gap:8px;align-items:center;margin-bottom:9px}
+.inp-lbl{font-size:12px;color:var(--text2);width:66px;flex-shrink:0}
+.qty-wrap{display:flex;align-items:center;gap:7px;flex:1}
+.qty-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border2);background:var(--card);font-size:20px;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .1s;line-height:1}
+.qty-btn:active{background:var(--bg2);transform:scale(.94)}
+.stock-inp{flex:1;background:var(--card);border:2px solid var(--accent);border-radius:10px;padding:8px;font-size:20px;font-family:'DM Mono',monospace;font-weight:500;color:var(--accent2);text-align:center;outline:none;min-width:0}
+.price-inp-s{flex:1;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:8px 10px;font-size:15px;font-family:'DM Mono',monospace;color:var(--text);text-align:right;outline:none;min-width:0}
+.price-inp-s:focus{border-color:var(--yellow)}
+.unit-inp-s{width:70px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:8px 10px;font-size:14px;font-family:'Noto Sans JP',sans-serif;color:var(--text);text-align:center;outline:none}
+.unit-inp-s:focus{border-color:var(--accent)}
+
+
+
+/* ── マスタテーブル スマホ対応 ── */
+@media(max-width:640px){
+  .pc-only{display:none}
+  #masterTableEl td,#masterTableEl th{padding:9px 8px;font-size:12px}
+  .action-btn{padding:5px 10px;font-size:11px}
+  .m-card-unit-price-sp{display:inline;font-family:'DM Mono',monospace;font-size:10px;color:var(--accent2);background:var(--accent-p);padding:1px 6px;border-radius:20px;margin-left:4px}
+}
+@media(min-width:641px){
+  .m-card-unit-price-sp{display:none}
+}
+
+/* ── マスタカード ── */
+.m-card{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;padding:13px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.m-card-info{flex:1;min-width:0}
+.m-card-name{font-size:14px;font-weight:500;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-card-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--text3)}
+.m-card-price{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--text2);white-space:nowrap}
+.m-card-unit-price{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent2);background:var(--accent-p);padding:2px 7px;border-radius:20px;white-space:nowrap}
+.m-card-tana{font-size:11px;color:var(--accent);background:var(--accent-l);padding:2px 7px;border-radius:20px}
+.m-card-btns{display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+
+/* ── 期首表示 ── */
+.prev-stock-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0 8px;border-bottom:1px dashed var(--border);margin-bottom:8px;font-size:11px}
+.prev-stock-lbl{color:var(--text3)}
+.prev-stock-val{font-family:'DM Mono',monospace;color:var(--text3);font-size:12px}
+.istock-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.iprev{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)}
+.iprev::before{content:'期首 '}
+
+.inp-subtotal{display:flex;justify-content:space-between;align-items:center;padding:8px 0 0;border-top:1px solid var(--border)}
+.sub-lbl{font-size:12px;color:var(--text3)}
+.sub-val{font-family:'DM Mono',monospace;font-size:16px;font-weight:500;color:var(--accent2)}
+
+/* ── MASTER ── */
+.master-tabs{display:flex;gap:3px;margin-bottom:14px;background:var(--bg2);padding:4px;border-radius:10px;width:fit-content}
+.master-tab{padding:6px 16px;border-radius:7px;font-size:13px;cursor:pointer;color:var(--text3);transition:all .12s;font-weight:500}
+.master-tab.active{background:var(--card);color:var(--accent);box-shadow:var(--shadow)}
+.action-btn{padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid;transition:all .12s;font-family:'Noto Sans JP',sans-serif}
+.edit-btn{background:var(--blue-l);color:var(--blue);border-color:rgba(46,96,128,.25)}
+.edit-btn:hover{background:var(--blue);color:#fff}
+.del-btn{background:var(--red-l);color:var(--red);border-color:rgba(176,64,48,.25)}
+.del-btn:hover{background:var(--red);color:#fff}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(33,30,23,.45);z-index:500;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border-radius:16px;width:100%;max-width:440px;box-shadow:var(--shadow-lg);animation:modalIn .18s ease}
+@keyframes modalIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+.modal-hdr{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:700}
+.modal-close{background:none;border:none;font-size:20px;color:var(--text3);cursor:pointer;padding:2px 6px;border-radius:4px}
+.modal-close:hover{background:var(--bg2)}
+.modal-body{padding:20px}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* ── IMPORT / INVOICE ── */
+.upload-zone{background:var(--card);border:2px dashed var(--border2);border-radius:16px;padding:40px 24px;text-align:center;cursor:pointer;transition:all .18s;position:relative;overflow:hidden;margin-bottom:14px}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-p)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+.upload-icon{font-size:42px;margin-bottom:10px;line-height:1}
+.upload-title{font-size:15px;font-weight:500;color:var(--text);margin-bottom:5px}
+.upload-sub{font-size:12px;color:var(--text3)}
+.camera-hint{margin-top:12px;display:inline-flex;align-items:center;gap:6px;background:var(--accent-l);color:var(--accent2);font-size:11px;padding:5px 12px;border-radius:20px;font-weight:500}
+.preview-wrap{display:none;background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:14px}
+.preview-wrap.show{display:block}
+.preview-img-w{background:var(--bg3);display:flex;justify-content:center;max-height:320px;overflow:hidden;position:relative}
+.preview-img-w img{max-width:100%;max-height:320px;object-fit:contain;display:block}
+.preview-lbl{position:absolute;top:10px;left:10px;background:rgba(33,30,23,.7);color:#fff;font-size:11px;padding:3px 10px;border-radius:20px;font-family:'DM Mono',monospace}
+.preview-actions{padding:13px 16px;display:flex;gap:8px;border-top:1px solid var(--border)}
+.analyzing{display:none;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:36px;text-align:center;box-shadow:var(--shadow);margin-bottom:14px}
+.analyzing.show{display:block}
+.spinner{width:38px;height:38px;border:3px solid var(--bg3);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.an-steps{display:flex;flex-direction:column;gap:5px;margin-top:18px;text-align:left;max-width:260px;margin-inline:auto}
+.an-step{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text3);padding:5px 0}
+.an-step.done{color:var(--accent)}.an-step.active{color:var(--text);font-weight:500}
+.an-step-ico{font-size:13px;width:18px;text-align:center}
+.result-card{display:none;background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:14px}
+.result-card.show{display:block}
+.result-hdr{padding:13px 18px;background:linear-gradient(135deg,var(--accent-l),var(--accent-p));border-bottom:1px solid rgba(74,110,60,.15);display:flex;align-items:center;justify-content:space-between}
+.result-hdr-l{display:flex;align-items:center;gap:10px}
+.result-vendor-badge{background:var(--accent);color:#fff;font-size:11px;padding:3px 10px;border-radius:20px;font-family:'DM Mono',monospace}
+.edit-table{width:100%;border-collapse:collapse;font-size:12px}
+.edit-table th{padding:8px 10px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);background:var(--bg2);font-weight:400}
+.edit-table td{padding:8px 10px;border-bottom:1px solid rgba(212,207,195,.4);vertical-align:middle}
+.edit-table tr:last-child td{border-bottom:none}
+.ei{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:'Noto Sans JP',sans-serif;color:var(--text);width:100%;outline:none;transition:border-color .15s}
+.ei:focus{border-color:var(--accent);background:var(--card)}
+.cat-sel{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--text);outline:none;cursor:pointer;width:100%}
+.result-total-row{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;background:var(--bg2)}
+.result-total-val{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--accent2)}
+.confirm-footer{padding:13px 18px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.confirm-summary{flex:1;font-size:12px;color:var(--text3);min-width:160px;line-height:1.6}
+.success-box{display:none;background:var(--card);border:1px solid rgba(74,110,60,.2);border-radius:16px;padding:40px 24px;text-align:center;box-shadow:var(--shadow)}
+.success-box.show{display:block}
+.success-items-box{background:var(--accent-p);border:1px solid rgba(74,110,60,.15);border-radius:12px;padding:14px;margin:16px 0;text-align:left}
+.si-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(74,110,60,.1);font-size:12px}
+.si-row:last-child{border-bottom:none;font-weight:700}
+
+/* ── AIR REGI ── */
+.csv-upload{background:var(--card);border:2px dashed var(--border2);border-radius:16px;padding:40px 24px;text-align:center;cursor:pointer;transition:all .18s;position:relative;margin-bottom:16px}
+.csv-upload:hover,.csv-upload.drag{border-color:var(--blue);background:var(--blue-l)}
+.csv-upload input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.kpi-mini-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.kpi-mini{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
+.kpi-mini-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px}
+.kpi-mini-val{font-family:'DM Mono',monospace;font-size:17px;font-weight:500;color:var(--text)}
+.kpi-mini-val.green{color:var(--accent)}
+.kpi-mini-sub{font-size:10px;color:var(--text3);margin-top:3px}
+.info-banner{border-radius:10px;padding:9px 13px;margin-bottom:14px;font-size:12px;display:flex;align-items:center;gap:9px}
+.banner-purple{background:var(--purple-l);border:1px solid rgba(96,72,152,.2);color:var(--purple)}
+.banner-yellow{background:var(--yellow-l);border:1px solid rgba(184,138,8,.2);color:#7a5a0a}
+.banner-green{background:var(--accent-l);border:1px solid rgba(74,110,60,.2);color:var(--accent2)}
+
+/* ── FREEE ── */
+.ai-classify{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;box-shadow:var(--shadow)}
+.ai-hdr{padding:12px 18px;background:#f5f0ff;border-bottom:1px solid #e0d0f8;display:flex;align-items:center;gap:10px}
+.ai-badge{font-family:'DM Mono',monospace;font-size:9px;padding:2px 8px;background:#ede0ff;border:1px solid #c8a8f0;color:#7040b0;border-radius:20px}
+.ai-row{display:grid;grid-template-columns:1fr 110px 130px 70px;padding:10px 18px;border-bottom:1px solid rgba(212,207,195,.4);font-size:12px;align-items:center}
+.ai-row.ai-hdr-row{font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;background:var(--bg2)}
+.conf-h{color:var(--accent)}.conf-m{color:var(--yellow)}.conf-l{color:var(--red)}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);z-index:150;padding:6px 0;padding-bottom:max(6px,env(safe-area-inset-bottom));box-shadow:0 -3px 16px rgba(0,0,0,.08)}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:3px 0}
+.bn-item:active{opacity:.6}
+.bn-ico{font-size:20px}
+.bn-lbl{font-size:10px;color:var(--text3)}
+.bn-item.active .bn-lbl{color:var(--accent)}
+
+/* ── PAYMENT DONUT ── */
+.pay-row{display:flex;align-items:center;gap:18px;margin-top:6px}
+.pay-labels{flex:1;display:flex;flex-direction:column;gap:9px}
+.pay-label-item{display:flex;justify-content:space-between;align-items:center;font-size:12px}
+.pay-left{display:flex;align-items:center;gap:8px;color:var(--text2)}
+.pay-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.pay-right{font-family:'DM Mono',monospace;font-size:12px;color:var(--text)}
+.pay-pct-lbl{font-size:10px;color:var(--text3);margin-left:3px}
+
+/* ── INSIGHT ── */
+.insight-item{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--bg2);border-radius:9px;font-size:12px;margin-bottom:6px}
+.ins-lbl{color:var(--text2)}
+.ins-val{font-family:'DM Mono',monospace;font-weight:500}
+.ins-val.pos{color:var(--accent)}.ins-val.neg{color:var(--red)}
+
+/* ── HIGHLIGHT ROW ── */
+tr.highlight td{background:rgba(74,110,60,.04) !important}
+
+/* ── PRICE CHANGE MODAL ── */
+.price-modal-overlay{display:none;position:fixed;inset:0;background:rgba(33,30,23,.5);z-index:600;align-items:center;justify-content:center;padding:16px}
+.price-modal-overlay.open{display:flex}
+.price-modal{background:var(--card);border-radius:18px;width:100%;max-width:480px;box-shadow:var(--shadow-lg);animation:modalIn .18s ease;overflow:hidden}
+.price-modal-hdr{padding:18px 20px;border-bottom:1px solid var(--border);background:var(--yellow-l);display:flex;align-items:center;gap:10px}
+.price-modal-icon{font-size:22px}
+.price-modal-title{font-size:15px;font-weight:700;color:#5a3a00}
+.price-modal-sub{font-size:12px;color:#7a5a0a;margin-top:2px}
+.price-change-list{max-height:300px;overflow-y:auto}
+.price-change-row{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;padding:12px 20px;border-bottom:1px solid rgba(212,207,195,.5);font-size:13px}
+.price-change-row:last-child{border-bottom:none}
+.price-change-row.selected{background:var(--yellow-l)}
+.pc-name{font-weight:500;color:var(--text)}
+.pc-old{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);text-decoration:line-through}
+.pc-arrow{font-size:11px;color:var(--yellow)}
+.pc-new{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:var(--red)}
+.pc-diff{font-family:'DM Mono',monospace;font-size:10px;padding:2px 7px;border-radius:20px;background:#fef3f0;color:var(--red);border:1px solid #f5c8c0}
+.pc-diff.dn{background:var(--blue-l);color:var(--blue);border-color:#c0d8e8}
+.pc-chk{width:20px;height:20px;border-radius:5px;border:2px solid var(--border2);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .12s}
+.pc-chk.checked{background:var(--accent);border-color:var(--accent);color:#fff}
+.price-modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+.price-modal-footer-note{flex:1;font-size:11px;color:var(--text3);line-height:1.5}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:max(80px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(16px);background:var(--text);color:#fff;padding:9px 20px;border-radius:22px;font-size:13px;font-weight:500;opacity:0;transition:all .28s;white-space:nowrap;z-index:999;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:760px){
+  .sidebar{transform:translateX(-210px)}
+  .sidebar.open{transform:translateX(0);box-shadow:var(--shadow-lg)}
+  .main{margin-left:0}
+  .menu-btn{display:block}
+  .bottom-nav{display:flex}
+  body{padding-bottom:72px}
+  .page{padding:14px}
+  .kpi-row{grid-template-columns:1fr 1fr}
+  .kpi-row .kpi:first-child{grid-column:1/-1}
+  .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+  .kpi-mini-row{grid-template-columns:1fr 1fr}
+  .kpi-mini-row .kpi-mini:last-child{grid-column:1/-1}
+  .tana-content{padding:10px}
+  .ai-row{grid-template-columns:1fr 90px 90px}
+  .ai-row>div:last-child{display:none}
+  .form-grid{grid-template-columns:1fr 1fr;gap:8px}
+}
+@media(max-width:480px){
+  .kpi-val{font-size:15px}
+  .form-grid{grid-template-columns:1fr}
+  .master-tabs{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="overlay-bg" id="overlayBg" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-logo">
+    <div class="sb-logo-name">LOCAL STORE<br>経営管理</div>
+    <div class="sb-logo-sub">Management System v3</div>
+  </div>
+  <div class="sb-month">
+    <select id="monthSel" onchange="changeMonth(this.value)">
+      <option value="2026/01" selected>2026年 1月</option>
+      <option value="2025/12">2025年 12月</option>
+      <option value="2025/11">2025年 11月</option>
+    </select>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">メイン</div>
+    <div class="sb-item active" id="nav-dash"    onclick="nav('dash')">    <span class="ni">◈</span> ダッシュボード</div>
+    <div class="sb-item"        id="nav-sales"   onclick="nav('sales')">   <span class="ni">📊</span> 売上分析</div>
+    <div class="sb-item"        id="nav-shiire"  onclick="nav('shiire')">  <span class="ni">▤</span> 仕入台帳</div>
+    <div class="sb-item"        id="nav-tana"    onclick="nav('tana')">    <span class="ni">◫</span> 棚卸入力</div>
+    <div class="sb-item"        id="nav-monthly" onclick="nav('monthly')"> <span class="ni">◉</span> 月次集計</div>
+    <div class="sb-section">取込・管理</div>
+    <div class="sb-item"        id="nav-invoice" onclick="nav('invoice')"> <span class="ni">📷</span> 伝票 AI読取</div>
+    <div class="sb-item"        id="nav-airegi"  onclick="nav('airegi')">  <span class="ni">⇅</span> Airレジ CSV</div>
+    <div class="sb-item"        id="nav-freee"   onclick="nav('freee')">   <span class="ni">⇅</span> freee連携</div>
+    <div class="sb-item"        id="nav-master"  onclick="nav('master')">  <span class="ni">⊟</span> 品目マスタ</div>
+    <div class="sb-item"        id="nav-settings" onclick="nav('settings')"> <span class="ni">⚙</span> 設定・同期</div>
+  </nav>
+  <div class="sb-footer">
+    <button class="sb-cta" onclick="nav('invoice')" style="margin-bottom:8px">📷 伝票を読み取る</button>
+    <button onclick="openApiKeyModal()" style="width:100%;padding:7px;background:none;border:1px solid var(--border2);border-radius:8px;font-family:'Noto Sans JP',sans-serif;font-size:11px;color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .14s" id="apiKeyBtn">
+      <span id="apiKeyStatus">🔑 APIキーを設定する</span>
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+<div class="topbar">
+  <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+  <div class="topbar-title" id="pageTitle">ダッシュボード</div>
+  <span class="tb-badge" id="tbBadge">2026年1月</span>
+</div>
+
+<!-- ═══════════ DASHBOARD ═══════════ -->
+<div class="page active" id="page-dash">
+  <div class="kpi-row" id="dashKpi"></div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">月次推移（売上 / 原価 / 粗利）</div>
+      <div class="trend-bars" id="trendBars"></div>
+      <div class="legend-row">
+        <div class="leg-item"><div class="leg-dot" style="background:var(--blue)"></div>売上</div>
+        <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>原価</div>
+        <div class="leg-item"><div class="leg-dot" style="background:var(--accent)"></div>粗利</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">棚卸サマリ <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);text-transform:none;letter-spacing:0">(入力データより)</span></div>
+      <div id="tanaSnapshot"></div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">今月の売上（Airレジ） <span class="s-badge" id="salesDataBadge">未取込</span></div>
+      <div class="card" id="salesMiniCard">
+        <div style="text-align:center;padding:20px 0;color:var(--text3);font-size:13px">
+          Airレジ CSVを取込むと売上データが表示されます<br>
+          <button class="btn btn-primary" style="margin-top:12px;font-size:12px;padding:7px 16px" onclick="nav('airegi')">CSV を取込む →</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">最近の取引 <span class="s-badge">freee</span></div>
+      <div class="tbl-wrap"><table><thead><tr><th>日</th><th>取引先</th><th>分類</th><th class="r">金額</th></tr></thead>
+      <tbody id="dashTx"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 売上分析 ═══════════ -->
+<div class="page" id="page-sales">
+  <div id="salesNoData" style="text-align:center;padding:60px 24px;color:var(--text3)">
+    <div style="font-size:40px;margin-bottom:14px">📊</div>
+    <div style="font-size:15px;font-weight:500;margin-bottom:8px">Airレジ CSVを取込んでください</div>
+    <div style="font-size:13px;margin-bottom:24px">取込むと日別グラフ・曜日分析・支払手段内訳が表示されます</div>
+    <button class="btn btn-primary" onclick="nav('airegi')">CSVを取込む →</button>
+  </div>
+  <div id="salesDashboard" style="display:none">
+    <div class="kpi-mini-row" id="salesKpi"></div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-title">日別売上 <span id="salesPeriod" style="text-transform:none;letter-spacing:0;font-size:9px;color:var(--text3)"></span></div>
+        <div class="bar-chart" id="dailyBars" style="height:130px"></div>
+        <div class="legend-row">
+          <div class="leg-item"><div class="leg-dot" style="background:var(--blue)"></div>平日</div>
+          <div class="leg-item"><div class="leg-dot" style="background:var(--sat)"></div>土曜</div>
+          <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>日曜</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">曜日別 平均売上</div>
+        <div id="dowGrid"></div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">支払手段</div>
+        <div class="pay-row">
+          <svg width="96" height="96" viewBox="0 0 100 100" id="payDonut"></svg>
+          <div class="pay-labels" id="payLabels"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">売上サマリ</div>
+        <div id="salesInsight"></div>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="salesDetailTable">
+        <thead><tr><th>日付</th><th>曜日</th><th class="r">売上</th><th class="r">客数</th><th class="r">客単価</th><th class="r">商品数</th><th class="r">現金</th><th class="r">キャッシュレス</th><th class="r">割引</th></tr></thead>
+        <tbody id="salesDetailBody"></tbody>
+        <tfoot id="salesDetailFoot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 仕入台帳 ═══════════ -->
+<div class="page" id="page-shiire">
+  <div class="sec-title">仕入台帳 <span class="s-badge" id="shiireBadge"></span></div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="form-grid">
+      <div class="fg"><label>日付</label><input class="fi" type="date" id="s-date"></div>
+      <div class="fg"><label>業者</label><select class="fi" id="s-vendor"><option>だるまや</option><option>ヒラタ食材</option><option>ヒラタ包材</option><option>テクモア</option><option>ペーストリート/他</option><option>モノタロウ</option></select></div>
+      <div class="fg"><label>金額（税込）</label><input class="fi" type="number" id="s-amount" placeholder="0"></div>
+      <button class="btn btn-primary" onclick="addShiire()" style="height:38px;align-self:end">追加</button>
+    </div>
+    <div class="form-grid2">
+      <div class="fg"><label>分類</label><select class="fi" id="s-cat"><option>食材</option><option>包材</option><option>道具</option><option>その他</option></select></div>
+      <div class="fg"><label>メモ</label><input class="fi" type="text" id="s-memo" placeholder="任意"></div>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:10px">
+    <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3)">月計: <span id="shiireTotal" style="color:var(--accent2);font-weight:500"></span></span>
+  </div>
+  <div class="tbl-wrap"><table><thead><tr><th>日付</th><th>業者</th><th>分類</th><th class="r">金額</th><th>メモ</th><th></th></tr></thead><tbody id="shiireTable"></tbody></table></div>
+</div>
+
+<!-- ═══════════ 棚卸 ═══════════ -->
+<div class="page" id="page-tana" style="padding:0">
+  <div class="tana-sticky">
+    <div class="tana-inner">
+      <div style="flex:1;font-size:13px;color:var(--text2)">棚卸入力
+        <span style="font-size:10px;color:var(--text3);margin-left:6px" id="tanaMonthLabel"></span>
+      </div>
+      <button class="btn btn-sec" style="padding:7px 12px;font-size:11px;margin-right:6px;border-color:var(--accent);color:var(--accent)" onclick="confirmMonthEnd()">📅 今月確定</button>
+      <button class="btn btn-primary" style="padding:7px 16px;font-size:12px" onclick="saveAll()">保存</button>
+    </div>
+    <div class="prog-wrap">
+      <div class="prog-labels"><span id="progText">0 / 0 品</span><span id="progPct">0%</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    </div>
+  </div>
+  <div class="tana-tabs-wrap"><div class="tana-tabs" id="tanaTabs"></div></div>
+  <div class="tana-content" id="tanaContent"></div>
+</div>
+
+<!-- ═══════════ 月次集計 ═══════════ -->
+<div class="page" id="page-monthly">
+  <div class="sec-title">月次集計 <span class="s-badge" id="monthlyBadge"></span></div>
+  <div class="kpi-row" id="monthlyKpi" style="grid-template-columns:repeat(4,1fr)"></div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">売上・原価 <span class="s-badge" style="text-transform:none;letter-spacing:0">自動計算</span></div>
+      <div id="monthlyLeftRows"></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>固定費・販管費</span>
+        <button class="btn btn-primary btn-sm" onclick="openFixedCostModal()">＋ 項目追加</button>
+      </div>
+      <div id="fixedCostRows"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;border-top:1px solid var(--border);margin-top:4px">
+        <span style="font-size:12px;font-weight:700;color:var(--text2)">固定費合計</span>
+        <span style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--accent2)" id="fixedCostTotal">¥0</span>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <!-- 手残り（税引前） -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(212,207,195,.4)">
+          <span style="font-size:12px;color:var(--text2)">手残り（税引前）</span>
+          <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600" id="monthlyTeNokori">-</span>
+        </div>
+        <!-- 消費税貯金 -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(212,207,195,.4)">
+          <div>
+            <span style="font-size:12px;color:var(--text2)">消費税貯金</span>
+            <span style="font-size:10px;color:var(--text3);margin-left:6px">売上÷11</span>
+          </div>
+          <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--red)" id="monthlyShohizei">-</span>
+        </div>
+        <!-- 所得税概算 -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(212,207,195,.4)">
+          <div>
+            <span style="font-size:12px;color:var(--text2)">所得税概算</span>
+            <span style="font-size:10px;color:var(--text3);margin-left:4px" id="monthlyTaxRateLabel">手残り×20%</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select id="taxRateSel" onchange="onTaxRateChange()" style="font-size:11px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:3px 6px;color:var(--text2);cursor:pointer;outline:none">
+              <option value="0.10">10%</option>
+              <option value="0.15">15%</option>
+              <option value="0.20" selected>20%</option>
+              <option value="0.25">25%</option>
+              <option value="0.30">30%</option>
+            </select>
+            <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--red)" id="monthlyTax">-</span>
+          </div>
+        </div>
+        <!-- 実質手残り -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 4px">
+          <span style="font-size:14px;font-weight:700;color:var(--text)">実質手残り</span>
+          <span style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700" id="monthlyJissitsu">-</span>
+        </div>
+        <div style="font-size:10px;color:var(--text3)">手残り − 消費税貯金 − 所得税概算</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FIXED COST MODAL -->
+<div class="modal-overlay" id="fixedCostModalOverlay">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="fcModalTitle">固定費を追加</div>
+      <button class="modal-close" onclick="closeFixedCostModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg" style="margin-bottom:12px">
+        <label>項目名</label>
+        <input class="fi" id="fc-name" placeholder="例：家賃、電気代、リース料">
+      </div>
+      <div class="fg">
+        <label>月額（円）</label>
+        <input class="fi" type="number" id="fc-amount" placeholder="0">
+      </div>
+      <input type="hidden" id="fc-edit-id">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sec" onclick="closeFixedCostModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveFixedCost()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 設定・同期 ═══════════ -->
+<div class="page" id="page-settings">
+  <div class="sec-title">設定・同期 <span class="s-badge">Google Sheets</span></div>
+
+  <!-- GAS URL設定 -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title" style="margin-bottom:12px">Google Apps Script 連携</div>
+
+    <div style="background:var(--blue-l);border:1px solid rgba(46,96,128,.2);border-radius:10px;padding:13px 15px;margin-bottom:16px;font-size:12px;color:var(--blue);line-height:1.9">
+      <strong style="display:block;margin-bottom:6px">⚙️ 初回セットアップ手順</strong>
+      1. <a href="https://sheets.new" target="_blank" style="color:var(--blue);font-weight:500">Googleスプレッドシートを新規作成</a><br>
+      2. 「拡張機能」→「Apps Script」を開く<br>
+      3. <strong>GASコード</strong>（別ファイルで渡します）を全文貼り付けて保存<br>
+      4. 「デプロイ」→「新しいデプロイ」→ 種類:ウェブアプリ<br>
+      &nbsp;&nbsp;&nbsp;実行ユーザー:自分 / アクセス:全員 → デプロイ<br>
+      5. 表示されたURLをコピーして下に貼り付ける
+    </div>
+
+    <div class="fg" style="margin-bottom:12px">
+      <label>GAS デプロイ URL</label>
+      <input class="fi" id="gasUrlInput" type="url"
+        placeholder="https://script.google.com/macros/s/..."
+        style="font-size:12px;font-family:'DM Mono',monospace">
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="saveGasUrl()">URLを保存</button>
+      <button class="btn btn-sec" onclick="testGasConnection()" id="gasTestBtn">接続テスト</button>
+      <span id="gasStatusBadge" style="font-size:12px;color:var(--text3)"></span>
+    </div>
+  </div>
+
+  <!-- 同期設定 -->
+  <div class="card" style="margin-bottom:16px" id="syncSettingsCard">
+    <div class="card-title" style="margin-bottom:12px">同期設定</div>
+
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px">このデバイスの役割</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg2);border:2px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px;transition:all .12s" id="roleOwnerLabel">
+          <input type="radio" name="deviceRole" value="owner" id="roleOwner" onchange="saveDeviceRole('owner')" style="accent-color:var(--accent)">
+          <div>
+            <div style="font-weight:600">👑 オーナー</div>
+            <div style="font-size:10px;color:var(--text3)">仕入台帳・月次集計・全機能</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg2);border:2px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px;transition:all .12s" id="roleStaffLabel">
+          <input type="radio" name="deviceRole" value="staff" id="roleStaff" onchange="saveDeviceRole('staff')" style="accent-color:var(--accent)">
+          <div>
+            <div style="font-weight:600">📦 スタッフ</div>
+            <div style="font-size:10px;color:var(--text3)">棚卸入力・伝票読み取り</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:var(--bg2);border-radius:10px;padding:12px">
+        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:.1em;margin-bottom:6px">最終同期</div>
+        <div style="font-size:12px;color:var(--text2)" id="lastSyncTime">未同期</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:10px;padding:12px">
+        <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:.1em;margin-bottom:6px">同期状態</div>
+        <div style="font-size:12px" id="syncStatusText">-</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="syncNow('push')" id="syncPushBtn">
+        ↑ スプレッドシートに保存
+      </button>
+      <button class="btn btn-sec" onclick="syncNow('pull')" id="syncPullBtn">
+        ↓ 最新データを取得
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px">
+      ※ 棚卸「保存」ボタンを押すと自動でスプレッドシートに保存されます
+    </div>
+  </div>
+
+  <!-- 月次スナップショット -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title" style="margin-bottom:6px">月次データを記録する</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">月末に押すと今月の集計データがスプレッドシートに永久保存されます</div>
+    <button class="btn btn-primary" onclick="saveMonthSnapshot()">
+      📅 今月分を記録する
+    </button>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px" id="snapshotStatus"></div>
+  </div>
+
+  <!-- データ更新 -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title" style="margin-bottom:6px">品目マスタ・棚卸のリセット</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.7">
+      新しいアプリをダウンロードしたとき、または品目マスタをExcelの初期データに戻したいときに使います。<br>
+      ⚠️ 棚卸の入力済みデータも消えます。月末など棚卸完了後にお使いください。
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="startNextMonth()" style="flex:1;min-width:160px">
+        ▶ 翌月の棚卸を開始する
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.8">
+      ※ 今月確定済みの在庫数が翌月の期首になります<br>
+      ※ 当月の棚卸入力はクリアされます（仕入台帳・固定費は残ります）
+    </div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">個別リセット（上級）</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sec" style="font-size:11px;border-color:var(--yellow);color:var(--yellow)" onclick="resetMasterOnly()">
+          🔄 品目マスタだけ更新
+        </button>
+        <button class="btn btn-sec" style="font-size:11px;border-color:var(--red);color:var(--red)" onclick="resetAllData()">
+          ⚠️ 全データ初期化
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- データバックアップ -->
+  <div class="card">
+    <div class="card-title" style="margin-bottom:12px">ローカルバックアップ</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sec" onclick="exportLocalData()">💾 JSONでエクスポート</button>
+      <button class="btn btn-sec" onclick="document.getElementById('importFileInput').click()">📂 JSONから復元</button>
+      <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importLocalData(this)">
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px">
+      ブラウザのデータを消す前や機種変更前に必ずエクスポートしてください
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 伝票AI読取 ═══════════ -->
+<div class="page" id="page-invoice">
+  <div class="sec-title">伝票 AI 読取 <span class="s-badge">Claude AI</span></div>
+  <div class="info-banner banner-purple">🤖 Claude AIが伝票の品目・金額を読み取り、食材・包材に自動分類します。実際の伝票写真で動作します。</div>
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" accept="image/*" capture="environment" id="fileInput" onchange="handleInvoiceFile(this)">
+    <div class="upload-icon">📷</div>
+    <div class="upload-title">伝票を撮影 または 写真を選択</div>
+    <div class="upload-sub">タップしてカメラを起動 / ギャラリーから選択</div>
+    <div class="camera-hint">📱 スマホではカメラが直接起動します</div>
+  </div>
+  <div class="preview-wrap" id="previewWrap">
+    <div class="preview-img-w">
+      <img id="previewImg" src="" alt="">
+      <div class="preview-lbl">📷 撮影済み</div>
+    </div>
+    <div class="preview-actions">
+      <button class="btn btn-primary" onclick="analyzeInvoice()">🤖 AI で読み取る</button>
+      <button class="btn btn-sec" onclick="resetInvoice()">別の写真を選択</button>
+    </div>
+  </div>
+  <div class="analyzing" id="analyzingState">
+    <div class="spinner"></div>
+    <div style="font-size:14px;color:var(--text2);margin-bottom:5px">Claude AI が伝票を解析中...</div>
+    <div style="font-size:12px;color:var(--text3)">品目・金額・分類を自動認識しています</div>
+    <div class="an-steps">
+      <div class="an-step" id="an1"><span class="an-step-ico">📷</span> 画像を送信中</div>
+      <div class="an-step" id="an2"><span class="an-step-ico">🔍</span> テキストを抽出中</div>
+      <div class="an-step" id="an3"><span class="an-step-ico">🏷️</span> 食材 / 包材に分類中</div>
+      <div class="an-step" id="an4"><span class="an-step-ico">✅</span> 結果を整形中</div>
+    </div>
+  </div>
+  <div id="invoiceError" style="display:none;background:#fef3f0;border:1px solid #f5c8c0;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:var(--red);word-break:break-all"></div>
+  <div class="result-card" id="invoiceResult">
+    <div class="result-hdr">
+      <div class="result-hdr-l">
+        <span>✅</span>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:var(--accent2)" id="invTitle">読み取り完了</div>
+          <div style="font-size:11px;color:var(--text3)" id="invDate"></div>
+        </div>
+      </div>
+      <div class="result-vendor-badge" id="invVendor"></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="edit-table" id="invTable"><thead><tr>
+  <th>品目名 <span id="invUnmatchBadge" style="display:none;font-size:10px;background:#fef3f0;color:var(--red);border:1px solid #f5c8c0;border-radius:20px;padding:1px 7px;font-weight:400;margin-left:4px"></span></th>
+  <th>数量</th><th>単価</th><th>金額</th><th>分類</th><th style="width:32px"></th>
+</tr></thead><tbody id="invTableBody"></tbody></table>
+<button class="btn btn-sec btn-sm" onclick="addInvRow()" style="margin-top:8px;width:100%">＋ 行を追加</button>
+    </div>
+    <div class="result-total-row">
+      <div>
+        <div style="font-size:13px;color:var(--text2)">合計金額（税込）</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px" id="invBreakdown"></div>
+      </div>
+      <div class="result-total-val" id="invTotal"></div>
+    </div>
+    <div class="confirm-footer">
+      <div class="confirm-summary" id="invSummary"></div>
+      <button class="btn btn-sec" onclick="resetInvoice()">やり直す</button>
+      <button class="btn btn-primary" onclick="confirmInvoice()">✓ 仕入台帳に追加する</button>
+    </div>
+  </div>
+  <div class="success-box" id="invSuccess">
+    <div style="font-size:50px;margin-bottom:12px">🎉</div>
+    <div style="font-size:18px;font-weight:700;color:var(--accent);margin-bottom:5px">仕入台帳に追加しました！</div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:0" id="invSuccessSub"></div>
+    <div class="success-items-box" id="invSuccessItems"></div>
+    <button class="btn btn-primary" onclick="resetInvoiceAll()" style="margin-right:8px">続けて読み取る</button>
+    <button class="btn btn-sec" onclick="nav('shiire')">仕入台帳を確認する →</button>
+  </div>
+</div>
+
+<!-- ═══════════ Airレジ CSV ═══════════ -->
+<div class="page" id="page-airegi">
+  <div class="sec-title">Airレジ CSV 取込 <span class="s-badge">売上分析</span></div>
+  <div class="info-banner banner-yellow">💡 Airレジ バックオフィス → レポート → 売上集計 → CSV出力 からエクスポートしてください</div>
+  <div class="csv-upload" id="csvZone">
+    <input type="file" accept=".csv,text/csv" id="csvInput" onchange="handleCSV(this)">
+    <div class="upload-icon">📊</div>
+    <div class="upload-title">Airレジ CSV をドロップ</div>
+    <div class="upload-sub">または <span style="color:var(--blue);font-weight:500">クリックしてファイルを選択</span></div>
+  </div>
+  <div style="text-align:center;margin-bottom:20px">
+    <button class="btn btn-sec" onclick="loadSampleAiregi()" style="font-size:12px">📋 サンプルデータで試す（1月分）</button>
+  </div>
+  <div id="airegiPreview" style="display:none">
+    <div class="info-banner banner-green" id="airegiLoadedBanner"></div>
+    <div class="kpi-mini-row" id="airegiKpi"></div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">日別売上プレビュー</div>
+      <div class="bar-chart" id="airegiDailyBars" style="height:100px"></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="applyAiregi()">✓ 売上分析に反映する</button>
+      <button class="btn btn-sec" onclick="resetAiregi()">別のCSVを読み込む</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ freee連携 ═══════════ -->
+<div class="page" id="page-freee">
+  <div class="sec-title">freee CSV 取込 <span class="s-badge">AI自動仕分け</span></div>
+  <div class="upload-zone" style="margin-bottom:14px" onclick="simulateFreee()">
+    <div class="upload-icon">⇅</div>
+    <div class="upload-title">freee CSVをここにドロップ</div>
+    <div class="upload-sub">または クリックしてデモを実行する</div>
+  </div>
+  <div class="ai-classify" id="freeeResult" style="display:none">
+    <div class="ai-hdr">
+      <div style="font-size:13px;color:#5a3a8a;font-weight:500">AI 自動仕分け結果</div>
+      <div class="ai-badge">Claude AI</div>
+      <div style="margin-left:auto;font-size:11px;color:var(--text3)" id="freeeCount"></div>
+    </div>
+    <div class="ai-row ai-hdr-row"><div>摘要</div><div style="text-align:right">金額</div><div>AI判定</div><div style="text-align:right">信頼度</div></div>
+    <div id="freeeRows"></div>
+    <div style="padding:12px 18px;display:flex;gap:8px;border-top:1px solid var(--border)">
+      <button class="btn btn-primary" onclick="applyFreee()">集計シートに反映する</button>
+      <button class="btn btn-sec">仕分けを修正する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 品目マスタ ═══════════ -->
+<div class="page" id="page-master">
+  <div class="sec-title">品目マスタ <span class="s-badge">追加・編集・削除</span></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+    <input class="fi" type="search" placeholder="品目名で検索..." oninput="filterMaster(this.value)" style="max-width:240px">
+    <button class="btn btn-primary btn-sm" onclick="openAddModal()">＋ 品目追加</button>
+    <div style="margin-left:auto;font-size:12px;color:var(--text3)">全 <span id="masterCount" style="color:var(--accent);font-weight:700">0</span> 品目</div>
+  </div>
+  <div class="master-tabs" id="masterTabs"></div>
+  <div class="tbl-wrap">
+    <table id="masterTableEl">
+      <thead><tr>
+        <th>品目名</th>
+        <th class="r">仕入単価</th>
+        <th class="r pc-only" style="color:var(--accent2)">1当たり単価</th>
+        <th class="pc-only">仕入単位</th>
+        <th class="pc-only">入り数</th>
+        <th style="color:var(--accent2)">棚卸単位</th>
+        <th style="min-width:80px"></th>
+      </tr></thead>
+      <tbody id="masterTable"></tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <div class="bn-item active" id="bn-dash"    onclick="nav('dash')">   <div class="bn-ico">◈</div><div class="bn-lbl">ホーム</div></div>
+  <div class="bn-item"        id="bn-sales"   onclick="nav('sales')">  <div class="bn-ico">📊</div><div class="bn-lbl">売上</div></div>
+  <div class="bn-item"        id="bn-tana"    onclick="nav('tana')">   <div class="bn-ico">◫</div><div class="bn-lbl">棚卸</div></div>
+  <div class="bn-item"        id="bn-invoice" onclick="nav('invoice')"><div class="bn-ico">📷</div><div class="bn-lbl">伝票</div></div>
+  <div class="bn-item"        id="bn-master"  onclick="nav('master')"> <div class="bn-ico">⊟</div><div class="bn-lbl">マスタ</div></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="modalTitle">品目追加</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body">
+      <div class="fg" style="margin-bottom:12px"><label>品目名</label><input class="fi" id="m-name" placeholder="例：よつば生クリーム35%"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="fg"><label>業者 / シート</label><select class="fi" id="m-sheet"><option value="0">だるまや</option><option value="1">ヒラタ食材</option><option value="2">包材</option><option value="3">消耗品</option></select></div>
+        <div class="fg"><label>単位</label><input class="fi" id="m-unit" placeholder="例：ml、枚、個"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="fg"><label>仕入単価（円）</label><input class="fi" type="number" id="m-price" placeholder="0"></div>
+        <div class="fg"><label>入り数</label><input class="fi" type="number" id="m-qty" placeholder="例：1000"></div>
+        <div class="fg"><label>1当たり単位 <span style="font-weight:400;font-size:10px;color:var(--text3)">（表示用）</span></label><input class="fi" id="m-unit-label" placeholder="例：ml、枚、g"></div>
+      </div>
+      <div class="fg" style="background:var(--accent-p);border-radius:8px;padding:10px">
+        <label style="color:var(--accent2)">棚卸単位 <span style="font-weight:400;color:var(--text3)">（棚卸入力時の数え方）</span></label>
+        <input class="fi" id="m-tana-unit" placeholder="例：枚、袋、個、本（空欄なら仕入単位と同じ）">
+        <div style="font-size:10px;color:var(--text3);margin-top:5px">
+          例）ケーキ箱50枚入り → 仕入単位:セット、入り数:50、棚卸単位:枚<br>
+          　　コーンスターチ → 仕入単位:袋、入り数:1000、棚卸単位:袋（そのまま）
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sec" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveItem()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRICE CHANGE MODAL -->
+<div class="price-modal-overlay" id="priceModalOverlay">
+  <div class="price-modal">
+    <div class="price-modal-hdr">
+      <span class="price-modal-icon">⚠️</span>
+      <div>
+        <div class="price-modal-title">単価の変更が検出されました</div>
+        <div class="price-modal-sub">マスタに反映する品目にチェックを入れてください</div>
+      </div>
+    </div>
+    <div class="price-change-list" id="priceChangeList"></div>
+    <div class="price-modal-footer">
+      <div class="price-modal-footer-note">チェックした品目は<strong>品目マスタの単価</strong>と<strong>棚卸の⚠️バッジ</strong>が更新されます</div>
+      <button class="btn btn-sec" onclick="skipPriceUpdate()" style="white-space:nowrap">スキップ</button>
+      <button class="btn btn-primary" onclick="applyPriceUpdate()" style="white-space:nowrap">✓ 反映する</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- API KEY MODAL -->
+<div class="modal-overlay" id="apiKeyModalOverlay">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">🔑 Anthropic APIキー設定</div>
+      <button class="modal-close" onclick="closeApiKeyModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--blue-l);border:1px solid rgba(46,96,128,.2);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--blue);line-height:1.7">
+        <strong style="display:block;margin-bottom:4px">📋 APIキーの取得方法</strong>
+        1. <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com</a> にアクセス<br>
+        2. 「API Keys」→「Create Key」でキーを発行<br>
+        3. 発行された <code style="background:rgba(46,96,128,.1);padding:1px 5px;border-radius:4px">sk-ant-...</code> をここに入力
+      </div>
+      <div class="fg" style="margin-bottom:8px">
+        <label>APIキー</label>
+        <input class="fi" id="apiKeyInput" type="password" placeholder="sk-ant-api03-..." autocomplete="off" style="font-family:'DM Mono',monospace;font-size:12px">
+      </div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.6">
+        ⚠️ キーはこのブラウザにのみ保存されます。他人と共有しないでください。
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" onclick="clearApiKey()" style="margin-right:auto">キーを削除</button>
+      <button class="btn btn-sec" onclick="closeApiKeyModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveApiKey()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════
+// DATA
+// ════════════════════════════════════════════════════════════════════════
+
+const MONTHLY_HIST = [
+  {m:'8月', s:520000,c:248000,p:272000},{m:'9月', s:610000,c:298000,p:312000},
+  {m:'10月',s:580000,c:271000,p:309000},{m:'11月',s:720000,c:346000,p:374000},
+  {m:'12月',s:890000,c:421000,p:469000},{m:'1月', s:688420,c:312840,p:375580},
+];
+
+const AIREGI_REAL = [
+  {"day":7,"dow":2,"sales":17415,"customers":10,"items":41,"cash":5170,"cashless":12245,"discount":-695},
+  {"day":8,"dow":3,"sales":38550,"customers":20,"items":102,"cash":11520,"cashless":27030,"discount":0},
+  {"day":9,"dow":4,"sales":31190,"customers":11,"items":71,"cash":9690,"cashless":21500,"discount":0},
+  {"day":10,"dow":5,"sales":71200,"customers":31,"items":146,"cash":33420,"cashless":37780,"discount":0},
+  {"day":13,"dow":1,"sales":2475,"customers":1,"items":15,"cash":0,"cashless":2475,"discount":-2475},
+  {"day":14,"dow":2,"sales":21370,"customers":12,"items":40,"cash":6310,"cashless":15060,"discount":0},
+  {"day":15,"dow":3,"sales":34245,"customers":21,"items":82,"cash":10350,"cashless":23895,"discount":-490},
+  {"day":16,"dow":4,"sales":35715,"customers":20,"items":81,"cash":9965,"cashless":25750,"discount":0},
+  {"day":17,"dow":5,"sales":1650,"customers":1,"items":3,"cash":1650,"cashless":0,"discount":0},
+  {"day":18,"dow":6,"sales":65375,"customers":34,"items":132,"cash":12485,"cashless":52890,"discount":0},
+  {"day":21,"dow":2,"sales":29060,"customers":18,"items":83,"cash":7780,"cashless":21280,"discount":0},
+  {"day":22,"dow":3,"sales":23315,"customers":12,"items":61,"cash":7020,"cashless":16295,"discount":-2125},
+  {"day":23,"dow":4,"sales":39850,"customers":18,"items":99,"cash":10620,"cashless":29230,"discount":-40},
+  {"day":24,"dow":5,"sales":82130,"customers":34,"items":168,"cash":20100,"cashless":62030,"discount":0},
+  {"day":25,"dow":6,"sales":42855,"customers":28,"items":89,"cash":9605,"cashless":33250,"discount":0},
+  {"day":27,"dow":1,"sales":2420,"customers":2,"items":8,"cash":1400,"cashless":1020,"discount":0},
+  {"day":28,"dow":2,"sales":31080,"customers":17,"items":60,"cash":14040,"cashless":17040,"discount":0},
+  {"day":29,"dow":3,"sales":20370,"customers":10,"items":34,"cash":9480,"cashless":10890,"discount":0},
+  {"day":30,"dow":4,"sales":41935,"customers":22,"items":100,"cash":15725,"cashless":26210,"discount":-65},
+  {"day":31,"dow":5,"sales":56220,"customers":30,"items":115,"cash":15380,"cashless":40840,"discount":-540},
+];
+
+const FREEE_DATA = [
+  {desc:'ヒラタ食材 1月分',a:-286981,cat:'仕入（食材）',c:'high'},
+  {desc:'だるまや 1月分',  a:-44612, cat:'仕入（食材）',c:'high'},
+  {desc:'東京電力 電気代', a:-16943, cat:'固定費（電気）',c:'high'},
+  {desc:'東京ガス ガス代', a:-7542,  cat:'固定費（ガス）',c:'high'},
+  {desc:'楽天カード 引落', a:-37544, cat:'カード支払い',  c:'mid'},
+  {desc:'家賃 ○○ビル',   a:-65120, cat:'固定費（家賃）',c:'high'},
+  {desc:'ゴミ処理代',      a:-7865,  cat:'固定費（その他）',c:'high'},
+  {desc:'ヤマト運輸',      a:-825,   cat:'固定費（送料）',c:'high'},
+  {desc:'Airレジ 売上',   a:688420, cat:'売上',          c:'high'},
+  {desc:'テクモア',        a:-15000, cat:'要確認',        c:'low'},
+];
+
+const DEMO_INVOICE = {
+  vendor:'ヒラタ食材',date:'2026/01/20',
+  items:[
+    {name:'よつば生クリーム35%',qty:5,unit:'本',unitPrice:1320,amount:6600,category:'食材'},
+    {name:'よつばクリームチーズ',qty:3,unit:'個',unitPrice:1520,amount:4560,category:'食材'},
+    {name:'スーパーバイオレット',qty:1,unit:'袋',unitPrice:5820,amount:5820,category:'食材'},
+    {name:'ピスタチオペースト',  qty:1,unit:'個',unitPrice:10200,amount:10200,category:'食材'},
+    {name:'ケーキ箱5号',        qty:100,unit:'枚',unitPrice:113,amount:11300,category:'包材'},
+    {name:'ケーキ箱6号',        qty:50,unit:'枚',unitPrice:155,amount:7750,category:'包材'},
+  ],
+  subtotal:42936,tax:3294,total:46230
+};
+
+const DEFAULT_SHEETS = [
+  {id:'darumaya',name:'だるまや',items:[
+    {id:'d1',name:'いちごA',price:680.0,prevPrice:680.0,unitPrice:680.0,unit:'個',qty:null},
+    {id:'d2',name:'いちごB',price:800.0,prevPrice:800.0,unitPrice:800.0,unit:'個',qty:null},
+    {id:'d3',name:'たまご',price:4800.0,prevPrice:4800.0,unitPrice:24.0,unit:'個',qty:200.0},
+    {id:'d4',name:'メロン',price:900.0,prevPrice:900.0,unitPrice:900.0,unit:'個',qty:null},
+    {id:'d5',name:'ブルーベリー',price:550.0,prevPrice:550.0,unitPrice:550.0,unit:'個',qty:null},
+    {id:'d6',name:'フランボワーズ',price:1100.0,prevPrice:1100.0,unitPrice:1100.0,unit:'個',qty:null},
+    {id:'d7',name:'ブラックベリー',price:1100.0,prevPrice:1100.0,unitPrice:1100.0,unit:'個',qty:null},
+    {id:'d8',name:'りんご',price:4500.0,prevPrice:4500.0,unitPrice:4500.0,unit:'個',qty:null},
+    {id:'d9',name:'人参',price:300.0,prevPrice:300.0,unitPrice:300.0,unit:'個',qty:null},
+    {id:'d10',name:'いちじく',price:580.0,prevPrice:580.0,unitPrice:580.0,unit:'個',qty:null},
+    {id:'d11',name:'ゴールドパイン',price:680.0,prevPrice:680.0,unitPrice:680.0,unit:'個',qty:null},
+    {id:'d12',name:'バナナ',price:150.0,prevPrice:150.0,unitPrice:150.0,unit:'個',qty:null},
+    {id:'d13',name:'ラ・フランス',price:300.0,prevPrice:300.0,unitPrice:300.0,unit:'個',qty:null},
+    {id:'d14',name:'キウイフルーツ',price:260.0,prevPrice:260.0,unitPrice:260.0,unit:'個',qty:null},
+    {id:'d15',name:'レモン',price:85.0,prevPrice:85.0,unitPrice:85.0,unit:'個',qty:null},
+    {id:'d16',name:'みかん',price:580.0,prevPrice:580.0,unitPrice:580.0,unit:'個',qty:null},
+    {id:'d17',name:'プラム',price:680.0,prevPrice:680.0,unitPrice:680.0,unit:'ml',qty:null},
+    {id:'d18',name:'ゴールドパイン',price:780.0,prevPrice:780.0,unitPrice:780.0,unit:'個',qty:null},
+    {id:'d19',name:'さつまいも',price:450.0,prevPrice:450.0,unitPrice:0.45,unit:'個',qty:1000.0},
+    {id:'d20',name:'人参',price:180.0,prevPrice:180.0,unitPrice:180.0,unit:'個',qty:null}
+  ]},
+  {id:'hirata_food',name:'ヒラタ食材',items:[
+    {id:'h1',name:'ドーバーラム',price:2700.0,prevPrice:2700.0,unitPrice:1.5,unit:'ml',qty:1800.0},
+    {id:'h2',name:'アーモンドスライス',price:1840.0,prevPrice:1840.0,unitPrice:1.84,unit:'g',qty:1000.0},
+    {id:'h3',name:'コーンスターチ',price:290.0,prevPrice:290.0,unitPrice:0.29,unit:'g',qty:1000.0},
+    {id:'h4',name:'スーパーバイオレット',price:5820.0,prevPrice:5820.0,unitPrice:0.2328,unit:'個',qty:25000.0},
+    {id:'h5',name:'カメリア',price:5140.0,prevPrice:5140.0,unitPrice:0.2056,unit:'個',qty:25000.0},
+    {id:'h6',name:'ベーキングパウダー',price:2690.0,prevPrice:2690.0,unitPrice:1.345,unit:'g',qty:2000.0},
+    {id:'h7',name:'カカオニブ',price:5100.0,prevPrice:5100.0,unitPrice:5.1,unit:'g',qty:1000.0},
+    {id:'h8',name:'グラハムビスケット',price:5950.0,prevPrice:5950.0,unitPrice:1.19,unit:'g',qty:5000.0},
+    {id:'h9',name:'よつば生クリーム35％',price:1210.0,prevPrice:1210.0,unitPrice:1.21,unit:'ml',qty:1000.0},
+    {id:'h10',name:'よつば生クリーム42％',price:1320.0,prevPrice:1320.0,unitPrice:1.32,unit:'ml',qty:1000.0},
+    {id:'h11',name:'よつば生クリーム47%',price:1400.0,prevPrice:1400.0,unitPrice:1.4,unit:'ml',qty:1000.0},
+    {id:'h12',name:'よつば牛乳',price:275.0,prevPrice:275.0,unitPrice:0.275,unit:'ml',qty:1000.0},
+    {id:'h13',name:'レフレール10',price:800.0,prevPrice:800.0,unitPrice:0.8,unit:'個',qty:1000.0},
+    {id:'h14',name:'ヨーグルト',price:170.0,prevPrice:170.0,unitPrice:0.425,unit:'個',qty:400.0},
+    {id:'h15',name:'中沢クロテッドクリーム',price:305.0,prevPrice:305.0,unitPrice:3.05,unit:'ml',qty:100.0},
+    {id:'h16',name:'中沢サワークリーム',price:1950.0,prevPrice:1950.0,unitPrice:1.95,unit:'ml',qty:1000.0},
+    {id:'h17',name:'サンモレ　フレッシュマスカルポーネ',price:1810.0,prevPrice:1810.0,unitPrice:1.81,unit:'個',qty:1000.0},
+    {id:'h18',name:'白ワインビネガー',price:580.0,prevPrice:580.0,unitPrice:1.16,unit:'ml',qty:500.0},
+    {id:'h19',name:'ホワイトクーベルチュールナパル',price:5700.0,prevPrice:5700.0,unitPrice:3.8,unit:'g',qty:1500.0},
+    {id:'h20',name:'アーモンドダイス皮なし',price:1780.0,prevPrice:1780.0,unitPrice:1.78,unit:'g',qty:1000.0},
+    {id:'h21',name:'凍結加糖卵黄',price:1060.0,prevPrice:1060.0,unitPrice:1.06,unit:'個',qty:1000.0},
+    {id:'h22',name:'冷凍バター',price:850.0,prevPrice:850.0,unitPrice:1.8889,unit:'g',qty:450.0},
+    {id:'h23',name:'よつばクリームチーズ',price:1470.0,prevPrice:1470.0,unitPrice:1.47,unit:'ml',qty:1000.0},
+    {id:'h24',name:'ケスクレム　クリームチーズプラス',price:3850.0,prevPrice:3850.0,unitPrice:1.925,unit:'ml',qty:2000.0},
+    {id:'h25',name:'粉糖',price:1440.0,prevPrice:1440.0,unitPrice:0.36,unit:'g',qty:4000.0},
+    {id:'h26',name:'粗塩',price:310.0,prevPrice:310.0,unitPrice:0.31,unit:'g',qty:1000.0},
+    {id:'h27',name:'ココアパウダー テラロッサ',price:4270.0,prevPrice:4270.0,unitPrice:4.27,unit:'g',qty:1000.0},
+    {id:'h28',name:'クーベルチュール53.9%クアドル',price:16560.0,prevPrice:16560.0,unitPrice:3.312,unit:'g',qty:5000.0},
+    {id:'h29',name:'クーベルチュール36.5%セイロン',price:5500.0,prevPrice:5500.0,unitPrice:3.6667,unit:'g',qty:1500.0},
+    {id:'h30',name:'みずあめ',price:740.0,prevPrice:740.0,unitPrice:0.6981,unit:'g',qty:1060.0},
+    {id:'h31',name:'バニラペースト',price:5000.0,prevPrice:5000.0,unitPrice:10.0,unit:'g',qty:500.0},
+    {id:'h32',name:'バニラビーンズ',price:4400.0,prevPrice:4400.0,unitPrice:44.0,unit:'g',qty:100.0},
+    {id:'h33',name:'ビアリッツ　レモンプロフェッショナル',price:1300.0,prevPrice:1300.0,unitPrice:1.413,unit:'個',qty:920.0},
+    {id:'h34',name:'くるみ',price:1990.0,prevPrice:1990.0,unitPrice:1.99,unit:'個',qty:1000.0},
+    {id:'h35',name:'レーズン',price:890.0,prevPrice:890.0,unitPrice:0.89,unit:'g',qty:1000.0},
+    {id:'h36',name:'ミロワール　ブリアン　ナパージュ',price:880.0,prevPrice:880.0,unitPrice:0.88,unit:'g',qty:1000.0},
+    {id:'h37',name:'ココナッツファイン',price:1160.0,prevPrice:1160.0,unitPrice:1.16,unit:'g',qty:1000.0},
+    {id:'h38',name:'フランボワーズブリゼ',price:2110.0,prevPrice:2110.0,unitPrice:2.11,unit:'個',qty:1000.0},
+    {id:'h39',name:'太白ごまあぶら',price:2250.0,prevPrice:2250.0,unitPrice:1.3636,unit:'ml',qty:1650.0},
+    {id:'h40',name:'アーモンドプードル皮無',price:1730.0,prevPrice:1730.0,unitPrice:1.73,unit:'g',qty:1000.0},
+    {id:'h41',name:'はちみつ',price:2000.0,prevPrice:2000.0,unitPrice:0.8,unit:'g',qty:2500.0},
+    {id:'h42',name:'アーモンドホール',price:1770.0,prevPrice:1770.0,unitPrice:1.77,unit:'g',qty:1000.0},
+    {id:'h43',name:'ラフティスノー',price:1520.0,prevPrice:1520.0,unitPrice:1.52,unit:'個',qty:1000.0},
+    {id:'h44',name:'ゼラチン',price:2120.0,prevPrice:2120.0,unitPrice:4.24,unit:'g',qty:500.0},
+    {id:'h45',name:'プラリネマッセ/ヘーゼルペースト',price:3260.0,prevPrice:3260.0,unitPrice:3.26,unit:'g',qty:1000.0},
+    {id:'h46',name:'パルメザンパウダー',price:2480.0,prevPrice:2480.0,unitPrice:2.48,unit:'g',qty:1000.0},
+    {id:'h47',name:'GABANシナモンパウダー',price:1060.0,prevPrice:1060.0,unitPrice:3.5333,unit:'g',qty:300.0},
+    {id:'h48',name:'GABANカルダモンパウダー',price:2550.0,prevPrice:2550.0,unitPrice:10.2,unit:'g',qty:250.0},
+    {id:'h49',name:'GABANクローブパウダー',price:1480.0,prevPrice:1480.0,unitPrice:7.4,unit:'g',qty:200.0},
+    {id:'h50',name:'カソナード',price:750.0,prevPrice:750.0,unitPrice:1.0,unit:'個',qty:750.0},
+    {id:'h51',name:'プラチョコホワイト',price:3520.0,prevPrice:3520.0,unitPrice:3.52,unit:'g',qty:1000.0},
+    {id:'h52',name:'ストロベリーピース',price:4120.0,prevPrice:4120.0,unitPrice:16.48,unit:'個',qty:250.0},
+    {id:'h53',name:'ドレンチェリー',price:1250.0,prevPrice:1250.0,unitPrice:3.125,unit:'個',qty:400.0},
+    {id:'h54',name:'ミックスフルーツ',price:1870.0,prevPrice:1870.0,unitPrice:1.87,unit:'個',qty:1000.0},
+    {id:'h55',name:'マカダミアナッツ',price:2300.0,prevPrice:2300.0,unitPrice:2.3,unit:'g',qty:1000.0},
+    {id:'h56',name:'プチドリップ',price:1130.0,prevPrice:1130.0,unitPrice:2.26,unit:'個',qty:500.0},
+    {id:'h57',name:'アスコルビン酸',price:4200.0,prevPrice:4200.0,unitPrice:4.2,unit:'個',qty:1000.0},
+    {id:'h58',name:'イナアガー',price:2420.0,prevPrice:2420.0,unitPrice:4.84,unit:'ml',qty:500.0},
+    {id:'h59',name:'Dココアバター',price:5060.0,prevPrice:5060.0,unitPrice:4.2167,unit:'g',qty:1200.0},
+    {id:'h60',name:'冷凍かぼちゃペースト',price:730.0,prevPrice:730.0,unitPrice:1.46,unit:'g',qty:500.0},
+    {id:'h61',name:'キャンディングマロン',price:5350.0,prevPrice:5350.0,unitPrice:2.14,unit:'g',qty:2500.0},
+    {id:'h62',name:'蒸し栗ペースト',price:2500.0,prevPrice:2500.0,unitPrice:2.5,unit:'g',qty:1000.0},
+    {id:'h63',name:'マロンクリーム',price:1320.0,prevPrice:1320.0,unitPrice:1.32,unit:'ml',qty:1000.0},
+    {id:'h64',name:'マロンペースト',price:1940.0,prevPrice:1940.0,unitPrice:1.94,unit:'g',qty:1000.0},
+    {id:'h65',name:'ピスタチオペースト',price:9800.0,prevPrice:9800.0,unitPrice:9.8,unit:'g',qty:1000.0},
+    {id:'h66',name:'黒糖',price:300.0,prevPrice:300.0,unitPrice:0.6,unit:'個',qty:500.0},
+    {id:'h67',name:'カフェエキストラ',price:3900.0,prevPrice:3900.0,unitPrice:7.8,unit:'ml',qty:500.0},
+    {id:'h68',name:'グルマンディーズノンアルコールフレーズ',price:3750.0,prevPrice:3750.0,unitPrice:3.75,unit:'個',qty:1000.0},
+    {id:'h69',name:'マジパンローマッセ',price:3410.0,prevPrice:3410.0,unitPrice:3.41,unit:'g',qty:1000.0},
+    {id:'h70',name:'金箔さらら',price:6400.0,prevPrice:6400.0,unitPrice:640.0,unit:'個',qty:10.0},
+    {id:'h71',name:'中沢　ショコラティエ500g',price:1730.0,prevPrice:1730.0,unitPrice:3.46,unit:'個',qty:500.0},
+    {id:'h72',name:'タカ　桜　ゆずピューレ',price:2800.0,prevPrice:2800.0,unitPrice:2.8,unit:'ml',qty:1000.0},
+    {id:'h73',name:'ボワロン　フランボワーズピューレ加糖',price:2510.0,prevPrice:2510.0,unitPrice:2.51,unit:'ml',qty:1000.0},
+    {id:'h74',name:'ボワロン　フレーズピューレ加糖',price:1860.0,prevPrice:1860.0,unitPrice:1.86,unit:'ml',qty:1000.0},
+    {id:'h75',name:'ボワロン　マンゴーピューレ',price:2400.0,prevPrice:2400.0,unitPrice:2.4,unit:'ml',qty:1000.0},
+    {id:'h76',name:'白　こしあん',price:620.0,prevPrice:620.0,unitPrice:0.62,unit:'g',qty:1000.0},
+    {id:'h77',name:'ヘーゼルナッツホール',price:5290.0,prevPrice:5290.0,unitPrice:5.29,unit:'g',qty:1000.0},
+    {id:'h78',name:'みかん M #2',price:380.0,prevPrice:380.0,unitPrice:380.0,unit:'個',qty:null},
+    {id:'h79',name:'ゴールドリーフ 黄桃ハーフ#2',price:360.0,prevPrice:360.0,unitPrice:360.0,unit:'個',qty:null},
+    {id:'h80',name:'ゴールドリーフ杏ハーフ',price:480.0,prevPrice:480.0,unitPrice:480.0,unit:'個',qty:null},
+    {id:'h81',name:'DGFトリモリーヌ 転化糖',price:5400.0,prevPrice:5400.0,unitPrice:0.7714,unit:'個',qty:7000.0},
+    {id:'h82',name:'ボワロン　パッションフルーツピューレ無加糖',price:2700.0,prevPrice:2700.0,unitPrice:2.7,unit:'ml',qty:1000.0},
+    {id:'h83',name:'マンゴーチャンク',price:545.0,prevPrice:545.0,unitPrice:1.09,unit:'個',qty:500.0},
+    {id:'h84',name:'宇治抹茶',price:3360.0,prevPrice:3360.0,unitPrice:11.2,unit:'個',qty:300.0},
+    {id:'h85',name:'カカオバリー　パータグラッセブリュン',price:13590.0,prevPrice:13590.0,unitPrice:2.718,unit:'g',qty:5000.0},
+    {id:'h86',name:'メープルシュガーパウダー',price:2700.0,prevPrice:2700.0,unitPrice:2.7,unit:'g',qty:1000.0},
+    {id:'h87',name:'HBSP　ビートグラニュー糖',price:9200.0,prevPrice:9200.0,unitPrice:0.3067,unit:'g',qty:30000.0},
+    {id:'h88',name:'ジャンドゥーヤ　ノワゼット',price:15000.0,prevPrice:15000.0,unitPrice:6.0,unit:'個',qty:2500.0}
+  ]},
+  {id:'hozai',name:'包材',items:[
+    {id:'p1',name:'アルミプリンカップ',price:3590.0,prevPrice:3590.0,unitPrice:35.9,unit:'個',qty:100.0},
+    {id:'p2',name:'プリンカップ蓋',price:769.0,prevPrice:769.0,unitPrice:7.69,unit:'個',qty:100.0},
+    {id:'p3',name:'ケーキ箱0.5号',price:1050.0,prevPrice:1050.0,unitPrice:21.0,unit:'枚',qty:50.0},
+    {id:'p4',name:'ケーキ箱1号',price:1100.0,prevPrice:1100.0,unitPrice:22.0,unit:'枚',qty:50.0},
+    {id:'p5',name:'ケーキ箱２号',price:1400.0,prevPrice:1400.0,unitPrice:28.0,unit:'枚',qty:50.0},
+    {id:'p6',name:'ケーキ箱３号',price:1850.0,prevPrice:1850.0,unitPrice:37.0,unit:'枚',qty:50.0},
+    {id:'p7',name:'ケーキ箱４号',price:8800.0,prevPrice:8800.0,unitPrice:88.0,unit:'枚',qty:100.0},
+    {id:'p8',name:'ケーキ箱5号',price:11300.0,prevPrice:11300.0,unitPrice:113.0,unit:'枚',qty:100.0},
+    {id:'p9',name:'ケーキ箱6号',price:15500.0,prevPrice:15500.0,unitPrice:155.0,unit:'枚',qty:100.0},
+    {id:'p10',name:'保冷剤',price:1520.0,prevPrice:1520.0,unitPrice:3.8,unit:'個',qty:400.0},
+    {id:'p11',name:'パーチ帯大ここからCF15',price:1410.0,prevPrice:1410.0,unitPrice:1.41,unit:'枚',qty:1000.0},
+    {id:'p12',name:'パーチ帯小ここからCF13',price:1200.0,prevPrice:1200.0,unitPrice:1.2,unit:'枚',qty:1000.0},
+    {id:'p13',name:'カルシート',price:2160.0,prevPrice:2160.0,unitPrice:3.6,unit:'枚',qty:600.0},
+    {id:'p14',name:'手提げ白　小',price:1200.0,prevPrice:1200.0,unitPrice:24.0,unit:'個',qty:50.0},
+    {id:'p15',name:'手提げ白　中',price:2000.0,prevPrice:2000.0,unitPrice:40.0,unit:'個',qty:50.0},
+    {id:'p16',name:'手提げ白　大',price:2030.0,prevPrice:2030.0,unitPrice:40.6,unit:'個',qty:50.0},
+    {id:'p17',name:'6号サイズ手提げバッグ',price:5044.0,prevPrice:5044.0,unitPrice:126.1,unit:'個',qty:40.0},
+    {id:'p18',name:'H25チャームバッグ18-2未晒無地',price:800.0,prevPrice:800.0,unitPrice:16.0,unit:'個',qty:50.0},
+    {id:'p19',name:'25チャームバッグ21-12未晒無地',price:1250.0,prevPrice:1250.0,unitPrice:25.0,unit:'個',qty:50.0},
+    {id:'p20',name:'化粧箱　小',price:105.0,prevPrice:105.0,unitPrice:105.0,unit:'枚',qty:null},
+    {id:'p21',name:'化粧箱　中',price:120.0,prevPrice:120.0,unitPrice:120.0,unit:'枚',qty:null},
+    {id:'p22',name:'化粧箱　大',price:126.0,prevPrice:126.0,unitPrice:126.0,unit:'枚',qty:null},
+    {id:'p23',name:'クロテッド容器',price:330.0,prevPrice:330.0,unitPrice:6.6,unit:'個',qty:50.0},
+    {id:'p24',name:'木製アイスへら',price:360.0,prevPrice:360.0,unitPrice:1.8,unit:'個',qty:200.0},
+    {id:'p25',name:'純白袋NO５',price:1050.0,prevPrice:1050.0,unitPrice:2.1,unit:'枚',qty:500.0},
+    {id:'p26',name:'薄葉紙',price:1600.0,prevPrice:1600.0,unitPrice:8.0,unit:'枚',qty:200.0},
+    {id:'p27',name:'ワックスペーパー',price:1800.0,prevPrice:1800.0,unitPrice:1.8,unit:'枚',qty:1000.0},
+    {id:'p28',name:'OPPシート',price:3600.0,prevPrice:3600.0,unitPrice:7.2,unit:'枚',qty:500.0},
+    {id:'p29',name:'スペースベルト',price:9200.0,prevPrice:9200.0,unitPrice:4.6,unit:'個',qty:2000.0},
+    {id:'p30',name:'金トレー0.5号',price:4600.0,prevPrice:4600.0,unitPrice:11.5,unit:'個',qty:400.0},
+    {id:'p31',name:'金トレー4号',price:3800.0,prevPrice:3800.0,unitPrice:38.0,unit:'個',qty:100.0},
+    {id:'p32',name:'金トレー5号',price:5100.0,prevPrice:5100.0,unitPrice:51.0,unit:'個',qty:100.0},
+    {id:'p33',name:'金トレー6号',price:6200.0,prevPrice:6200.0,unitPrice:62.0,unit:'個',qty:100.0},
+    {id:'p34',name:'キャンドル5本入り',price:22800.0,prevPrice:22800.0,unitPrice:19.0,unit:'個',qty:1200.0},
+    {id:'p35',name:'D-83のり付パック',price:2900.0,prevPrice:2900.0,unitPrice:2.9,unit:'枚',qty:1000.0},
+    {id:'p36',name:'D-9のり付パック',price:2640.0,prevPrice:2640.0,unitPrice:2.64,unit:'枚',qty:1000.0},
+    {id:'p37',name:'ガス袋55x25',price:3250.0,prevPrice:3250.0,unitPrice:6.5,unit:'枚',qty:500.0},
+    {id:'p38',name:'ガス袋70x30',price:3500.0,prevPrice:3500.0,unitPrice:7.0,unit:'枚',qty:500.0},
+    {id:'p39',name:'脱酸素剤サンソレス',price:570.0,prevPrice:570.0,unitPrice:1.9,unit:'個',qty:300.0},
+    {id:'p40',name:'Z-13透明無地パック',price:3400.0,prevPrice:3400.0,unitPrice:3.4,unit:'枚',qty:1000.0},
+    {id:'p41',name:'角底茶袋',price:370.0,prevPrice:370.0,unitPrice:3.7,unit:'枚',qty:100.0},
+    {id:'p42',name:'thankyou袋　小',price:800.0,prevPrice:800.0,unitPrice:2.6667,unit:'枚',qty:300.0},
+    {id:'p43',name:'thankyou袋　中',price:350.0,prevPrice:350.0,unitPrice:7.0,unit:'枚',qty:50.0},
+    {id:'p44',name:'thankyou袋　大',price:1710.0,prevPrice:1710.0,unitPrice:8.55,unit:'枚',qty:200.0},
+    {id:'p45',name:'新プリンカップ',price:2600.0,prevPrice:2600.0,unitPrice:26.0,unit:'個',qty:100.0},
+    {id:'p46',name:'アリエクいちご箱',price:415.0,prevPrice:415.0,unitPrice:41.5,unit:'枚',qty:10.0},
+    {id:'p47',name:'怪獣袋',price:421.0,prevPrice:421.0,unitPrice:8.42,unit:'枚',qty:50.0},
+    {id:'p48',name:'紙ケース（ケーキ台紙）',price:705.0,prevPrice:705.0,unitPrice:1.41,unit:'枚',qty:500.0},
+    {id:'p49',name:'脚付きデザートカップ',price:33.0,prevPrice:33.0,unitPrice:33.0,unit:'個',qty:null},
+    {id:'p50',name:'pvc円筒ケース',price:112.0,prevPrice:112.0,unitPrice:112.0,unit:'個',qty:null},
+    {id:'p51',name:'敬老の日シール',price:1030.0,prevPrice:1030.0,unitPrice:2.06,unit:'枚',qty:500.0},
+    {id:'p52',name:'父の日シール',price:350.0,prevPrice:350.0,unitPrice:0.875,unit:'枚',qty:400.0},
+    {id:'p53',name:'ラミジップLZ-11',price:1200.0,prevPrice:1200.0,unitPrice:24.0,unit:'枚',qty:50.0},
+    {id:'p54',name:'クリスマス 森の小人セット',price:19500.0,prevPrice:19500.0,unitPrice:65.0,unit:'個',qty:300.0},
+    {id:'p55',name:'クリスマス ツリー中',price:6520.0,prevPrice:6520.0,unitPrice:16.3,unit:'個',qty:400.0},
+    {id:'p56',name:'クリスマス ユポピYX-6',price:2200.0,prevPrice:2200.0,unitPrice:4.4,unit:'個',qty:500.0},
+    {id:'p57',name:'クリスマス ユポピYX-7',price:2200.0,prevPrice:2200.0,unitPrice:4.4,unit:'個',qty:500.0},
+    {id:'p58',name:'クリスマス ミニリースグリーン',price:4500.0,prevPrice:4500.0,unitPrice:45.0,unit:'個',qty:100.0},
+    {id:'p59',name:'cotta　ショコラケース3個入',price:1250.0,prevPrice:1250.0,unitPrice:125.0,unit:'個',qty:10.0},
+    {id:'p60',name:'透明ロールシール',price:610.0,prevPrice:610.0,unitPrice:1.22,unit:'枚',qty:500.0},
+    {id:'p61',name:'ホワイトギフトボックス大',price:1645.0,prevPrice:1645.0,unitPrice:164.5,unit:'枚',qty:10.0},
+    {id:'p62',name:'ホワイトギフトボックス小',price:980.0,prevPrice:980.0,unitPrice:98.0,unit:'枚',qty:10.0},
+    {id:'p63',name:'紙パッキン',price:1015.0,prevPrice:1015.0,unitPrice:1015.0,unit:'枚',qty:null},
+    {id:'p64',name:'ラッピングペーパー（スター)',price:2200.0,prevPrice:2200.0,unitPrice:44.0,unit:'枚',qty:50.0},
+    {id:'p65',name:'ラッピングペーパー（チェック)',price:2200.0,prevPrice:2200.0,unitPrice:44.0,unit:'枚',qty:50.0},
+    {id:'p66',name:'シールリボン(thank you)',price:154.0,prevPrice:154.0,unitPrice:154.0,unit:'枚',qty:null},
+    {id:'p67',name:'シールjust for you蛍光レッド8面',price:132.0,prevPrice:132.0,unitPrice:132.0,unit:'枚',qty:null},
+    {id:'p68',name:'シールfor you',price:154.0,prevPrice:154.0,unitPrice:154.0,unit:'枚',qty:null}
+  ]},
+  {id:'shomou',name:'消耗品',items:[
+    {id:'s1',name:'ニトリルM',price:832.0,prevPrice:832.0,unitPrice:4.16,unit:'個',qty:200.0},
+    {id:'s2',name:'予約伝票',price:360.0,prevPrice:360.0,unitPrice:360.0,unit:'個',qty:null},
+    {id:'s3',name:'ラベルプリンタ用紙',price:3160.0,prevPrice:3160.0,unitPrice:263.3333,unit:'枚',qty:12.0},
+    {id:'s4',name:'レジロール',price:1691.0,prevPrice:1691.0,unitPrice:84.55,unit:'枚',qty:20.0},
+    {id:'s5',name:'ペーパータオル',price:3550.0,prevPrice:3550.0,unitPrice:118.3333,unit:'枚',qty:30.0},
+    {id:'s6',name:'ラップ',price:5500.0,prevPrice:5500.0,unitPrice:220.0,unit:'個',qty:25.0},
+    {id:'s7',name:'クッキングシート',price:7500.0,prevPrice:7500.0,unitPrice:312.5,unit:'枚',qty:24.0},
+    {id:'s8',name:'剥離スプレー',price:760.0,prevPrice:760.0,unitPrice:1.9,unit:'個',qty:400.0}
+  ]}
+];
+
+
+
+const TX_DASH = [
+  {d:'1/29',v:'ヒラタ食材',tag:'food',a:-286981},
+  {d:'1/27',v:'千葉銀行(電気)',tag:'fixed',a:-16943},
+  {d:'1/25',v:'だるまや',tag:'food',a:-44612},
+  {d:'1/22',v:'楽天カード',tag:'card',a:-37544},
+  {d:'1/08',v:'Airレジ',tag:'sale',a:688420},
+];
+
+const DEFAULT_STOCKS = {
+  'd1':{stock:3.0,prevStock:3.0},
+  'd2':{stock:2.0,prevStock:2.0},
+  'd3':{stock:0.2,prevStock:0.2},
+  'd5':{stock:0.5,prevStock:0.5},
+  'd12':{stock:1.0,prevStock:1.0},
+  'd14':{stock:0.5,prevStock:0.5},
+  'd16':{stock:0.2,prevStock:0.2},
+  'h1':{stock:0.7,prevStock:0.7},
+  'h2':{stock:1.0,prevStock:1.0},
+  'h3':{stock:0.8,prevStock:0.8},
+  'h4':{stock:1.0,prevStock:1.0},
+  'h5':{stock:1.0,prevStock:1.0},
+  'h6':{stock:0.7,prevStock:0.7},
+  'h7':{stock:0.9,prevStock:0.9},
+  'h8':{stock:0.1,prevStock:0.1},
+  'h9':{stock:7.0,prevStock:7.0},
+  'h10':{stock:4.0,prevStock:4.0},
+  'h12':{stock:5.0,prevStock:5.0},
+  'h13':{stock:1.5,prevStock:1.5},
+  'h14':{stock:0.5,prevStock:0.5},
+  'h15':{stock:1.0,prevStock:1.0},
+  'h16':{stock:0.4,prevStock:0.4},
+  'h18':{stock:0.9,prevStock:0.9},
+  'h19':{stock:1.0,prevStock:1.0},
+  'h20':{stock:1.0,prevStock:1.0},
+  'h21':{stock:2.0,prevStock:2.0},
+  'h22':{stock:30.0,prevStock:30.0},
+  'h23':{stock:2.5,prevStock:2.5},
+  'h24':{stock:2.0,prevStock:2.0},
+  'h25':{stock:0.3,prevStock:0.3},
+  'h26':{stock:0.3,prevStock:0.3},
+  'h27':{stock:0.4,prevStock:0.4},
+  'h28':{stock:1.0,prevStock:1.0},
+  'h29':{stock:1.0,prevStock:1.0},
+  'h30':{stock:0.4,prevStock:0.4},
+  'h31':{stock:0.9,prevStock:0.9},
+  'h32':{stock:0.2,prevStock:0.2},
+  'h33':{stock:1.2,prevStock:1.2},
+  'h34':{stock:0.8,prevStock:0.8},
+  'h35':{stock:0.5,prevStock:0.5},
+  'h36':{stock:1.3,prevStock:1.3},
+  'h37':{stock:1.5,prevStock:1.5},
+  'h38':{stock:0.3,prevStock:0.3},
+  'h39':{stock:0.7,prevStock:0.7},
+  'h40':{stock:1.3,prevStock:1.3},
+  'h41':{stock:0.1,prevStock:0.1},
+  'h42':{stock:0.5,prevStock:0.5},
+  'h43':{stock:0.5,prevStock:0.5},
+  'h44':{stock:0.4,prevStock:0.4},
+  'h45':{stock:1.3,prevStock:1.3},
+  'h46':{stock:0.8,prevStock:0.8},
+  'h47':{stock:0.9,prevStock:0.9},
+  'h48':{stock:0.6,prevStock:0.6},
+  'h49':{stock:0.4,prevStock:0.4},
+  'h50':{stock:0.9,prevStock:0.9},
+  'h51':{stock:0.5,prevStock:0.5},
+  'h53':{stock:0.3,prevStock:0.3},
+  'h54':{stock:0.5,prevStock:0.5},
+  'h55':{stock:0.4,prevStock:0.4},
+  'h56':{stock:0.6,prevStock:0.6},
+  'h57':{stock:0.5,prevStock:0.5},
+  'h58':{stock:0.4,prevStock:0.4},
+  'h59':{stock:0.6,prevStock:0.6},
+  'h61':{stock:0.8,prevStock:0.8},
+  'h63':{stock:0.6,prevStock:0.6},
+  'h64':{stock:5.0,prevStock:5.0},
+  'h65':{stock:1.0,prevStock:1.0},
+  'h67':{stock:0.6,prevStock:0.6},
+  'h68':{stock:0.7,prevStock:0.7},
+  'h69':{stock:0.0,prevStock:0.0},
+  'h70':{stock:0.5,prevStock:0.5},
+  'h71':{stock:0.9,prevStock:0.9},
+  'h72':{stock:3.0,prevStock:3.0},
+  'h74':{stock:0.5,prevStock:0.5},
+  'h75':{stock:0.3,prevStock:0.3},
+  'h76':{stock:0.7,prevStock:0.7},
+  'h77':{stock:1.0,prevStock:1.0},
+  'h78':{stock:1.5,prevStock:1.5},
+  'h79':{stock:1.0,prevStock:1.0},
+  'h82':{stock:0.5,prevStock:0.5},
+  'h83':{stock:0.7,prevStock:0.7},
+  'h85':{stock:0.5,prevStock:0.5},
+  'h86':{stock:0.5,prevStock:0.5},
+  'h87':{stock:0.7,prevStock:0.7},
+  'h88':{stock:0.005,prevStock:0.005},
+  'h89':{stock:1.0,prevStock:1.0},
+  'p1':{stock:0.3,prevStock:0.3},
+  'p2':{stock:0.3,prevStock:0.3},
+  'p3':{stock:54.0,prevStock:54.0},
+  'p4':{stock:30.0,prevStock:30.0},
+  'p5':{stock:42.0,prevStock:42.0},
+  'p6':{stock:52.0,prevStock:52.0},
+  'p7':{stock:59.0,prevStock:59.0},
+  'p8':{stock:37.0,prevStock:37.0},
+  'p9':{stock:47.0,prevStock:47.0},
+  'p10':{stock:0.5,prevStock:0.5},
+  'p11':{stock:0.5,prevStock:0.5},
+  'p12':{stock:0.5,prevStock:0.5},
+  'p13':{stock:0.5,prevStock:0.5},
+  'p17':{stock:14.0,prevStock:14.0},
+  'p18':{stock:25.0,prevStock:25.0},
+  'p19':{stock:9.0,prevStock:9.0},
+  'p23':{stock:0.1,prevStock:0.1},
+  'p24':{stock:0.1,prevStock:0.1},
+  'p25':{stock:1.9,prevStock:1.9},
+  'p26':{stock:0.2,prevStock:0.2},
+  'p27':{stock:0.9,prevStock:0.9},
+  'p28':{stock:0.3,prevStock:0.3},
+  'p29':{stock:0.4,prevStock:0.4},
+  'p30':{stock:0.9,prevStock:0.9},
+  'p31':{stock:55.0,prevStock:55.0},
+  'p32':{stock:35.0,prevStock:35.0},
+  'p33':{stock:44.0,prevStock:44.0},
+  'p34':{stock:0.7,prevStock:0.7},
+  'p35':{stock:0.4,prevStock:0.4},
+  'p36':{stock:1.0,prevStock:1.0},
+  'p37':{stock:1.0,prevStock:1.0},
+  'p38':{stock:1.0,prevStock:1.0},
+  'p39':{stock:0.5,prevStock:0.5},
+  'p40':{stock:0.8,prevStock:0.8},
+  'p41':{stock:1.5,prevStock:1.5},
+  'p42':{stock:14.0,prevStock:14.0},
+  'p43':{stock:17.0,prevStock:17.0},
+  'p44':{stock:4.0,prevStock:4.0},
+  'p45':{stock:4.3,prevStock:4.3},
+  'p46':{stock:34.0,prevStock:34.0},
+  'p47':{stock:2.0,prevStock:2.0},
+  'p48':{stock:4.1,prevStock:4.1},
+  'p49':{stock:120.0,prevStock:120.0},
+  'p51':{stock:0.9,prevStock:0.9},
+  'p52':{stock:0.8,prevStock:0.8},
+  'p53':{stock:0.2,prevStock:0.2},
+  'p54':{stock:1.5,prevStock:1.5},
+  'p55':{stock:200.0,prevStock:200.0},
+  'p56':{stock:200.0,prevStock:200.0},
+  'p57':{stock:0.3,prevStock:0.3},
+  'p58':{stock:0.3,prevStock:0.3},
+  'p59':{stock:71.0,prevStock:71.0},
+  'p60':{stock:41.0,prevStock:41.0},
+  'p61':{stock:0.9,prevStock:0.9},
+  'p62':{stock:26.0,prevStock:26.0},
+  'p63':{stock:1.0,prevStock:1.0},
+  'p64':{stock:0.3,prevStock:0.3},
+  'p65':{stock:0.5,prevStock:0.5},
+  'p66':{stock:0.5,prevStock:0.5},
+  'p67':{stock:15.0,prevStock:15.0},
+  'p68':{stock:9.0,prevStock:9.0},
+  'p69':{stock:9.0,prevStock:9.0},
+  's1':{stock:1.0,prevStock:1.0},
+  's2':{stock:2.0,prevStock:2.0},
+  's3':{stock:10.0,prevStock:10.0},
+  's4':{stock:16.0,prevStock:16.0},
+  's5':{stock:5.0,prevStock:5.0},
+  's6':{stock:7.0,prevStock:7.0},
+  's7':{stock:2.0,prevStock:2.0},
+  's8':{stock:1.0,prevStock:1.0},
+  's9':{stock:5.0,prevStock:5.0},
+};
+
+// ════════════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════════════
+
+let SHEETS = loadLS('ls_sheets', JSON.parse(JSON.stringify(DEFAULT_SHEETS)));
+let stocks = loadLS('ls_stocks', JSON.parse(JSON.stringify(DEFAULT_STOCKS)));
+let shiireData = loadLS('ls_shiire', []);
+let airegiData = loadLS('ls_airegi', null);
+let curPage = 'dash';
+let curTanaTab = 0;
+let openCard = null;
+let masterSheetIdx = 0;
+let editItemId = null;
+let invItems = [];
+let invImgB64 = null, invImgType = 'image/jpeg';
+
+function loadLS(key, def) { try { const d=localStorage.getItem(key); return d?JSON.parse(d):def; } catch(e){return def;} }
+function saveLS(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
+function showToast(msg, duration) {
+  const t = document.getElementById('toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration || 2500);
+}
+const yen = n => '¥'+Math.round(n).toLocaleString('ja-JP');
+const fmtAmt = n => (n<0?'-':'')+'¥'+Math.abs(Math.round(n)).toLocaleString('ja-JP');
+const DOW_JP = ['月','火','水','木','金','土','日'];
+
+// ════════════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════════════════════════
+
+const PAGE_TITLES = {dash:'ダッシュボード',sales:'売上分析',shiire:'仕入台帳',tana:'棚卸入力',monthly:'月次集計',invoice:'伝票 AI読取',airegi:'Airレジ CSV',freee:'freee連携',master:'品目マスタ',settings:'設定・同期'};
+
+function nav(page) {
+  curPage = page;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+  document.getElementById('nav-'+page)?.classList.add('active');
+  document.querySelectorAll('.bn-item').forEach(i=>i.classList.remove('active'));
+  document.getElementById('bn-'+page)?.classList.add('active');
+  document.getElementById('pageTitle').textContent = PAGE_TITLES[page];
+  closeSidebar();
+  if(page==='dash')    renderDash();
+  if(page==='sales')   renderSales();
+  if(page==='shiire')  renderShiire();
+  if(page==='tana')    renderTana();
+  if(page==='monthly') renderMonthly();
+  if(page==='master')  renderMaster();
+  if(page==='settings') { updateSyncStatus(); updateApiKeyStatus(); }
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlayBg').classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlayBg').classList.remove('show');
+}
+function changeMonth(v) { showToast('📅 '+v+' のデータを表示'); }
+
+// ════════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════════════════
+
+function renderDash() {
+  const ar = airegiData;
+  const tanaTotal = calcGrandTotal();
+  const shiireTotal = shiireData.reduce((s,r)=>s+r.amount,0);
+
+  // KPI – use real airegi if loaded
+  const totalSales = ar ? ar.reduce((s,d)=>s+d.sales,0) : 688420;
+  const totalCust  = ar ? ar.reduce((s,d)=>s+d.customers,0) : 352;
+  const rawProfit  = totalSales - 312840;
+  document.getElementById('dashKpi').innerHTML = [
+    {l:'税込売上',   v:yen(totalSales),         sub: ar?'Airレジ実データ':'推定値',cls:'k-green'},
+    {l:'総客数',     v:totalCust+'人',           sub:'客単価 '+yen(Math.round(totalSales/totalCust)),cls:'k-blue'},
+    {l:'仕入合計',   v:yen(shiireTotal||312840), sub:'食材+包材',cls:'k-red'},
+    {l:'棚卸合計',   v:yen(tanaTotal),           sub:'入力データより',cls:'k-yellow'},
+    {l:'粗利（概算）',v:yen(rawProfit),          sub:'売上−仕入',cls:'k-purple'},
+  ].map(k=>`<div class="kpi ${k.cls}"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  // Trend bars
+  const maxS = Math.max(...MONTHLY_HIST.map(d=>d.s));
+  document.getElementById('trendBars').innerHTML = MONTHLY_HIST.map(d=>`
+    <div class="t-grp">
+      <div class="t-inner">
+        <div class="t-bar bs" style="height:${d.s/maxS*62}px" title="${yen(d.s)}"></div>
+        <div class="t-bar bc" style="height:${d.c/maxS*62}px" title="${yen(d.c)}"></div>
+        <div class="t-bar bp" style="height:${d.p/maxS*62}px" title="${yen(d.p)}"></div>
+      </div>
+      <div class="t-lbl">${d.m}</div>
+    </div>`).join('');
+
+  // Tana snapshot
+  const totals = SHEETS.map((sh,i)=>({name:sh.name,total:calcSheetTotal(i)}));
+  document.getElementById('tanaSnapshot').innerHTML =
+    `<div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--accent2);margin-bottom:10px">${yen(tanaTotal)}</div>`+
+    totals.map(t=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--text2)">${t.name}</span><span style="font-family:'DM Mono',monospace">${yen(t.total)}</span></div>`).join('')+
+    `<div style="text-align:right;margin-top:8px"><span onclick="nav('tana')" style="font-size:11px;color:var(--accent);cursor:pointer;font-family:'DM Mono',monospace">棚卸入力へ →</span></div>`;
+
+  // Sales mini card
+  if(ar) {
+    const totalS=ar.reduce((s,d)=>s+d.sales,0);
+    const totalC=ar.reduce((s,d)=>s+d.customers,0);
+    document.getElementById('salesDataBadge').textContent='Airレジ実データ';
+    document.getElementById('salesDataBadge').style.background='var(--accent-l)';
+    document.getElementById('salesDataBadge').style.color='var(--accent2)';
+    document.getElementById('salesMiniCard').innerHTML=`
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px">月間売上</div><div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--accent2)">${yen(totalS)}</div></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px">客数</div><div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--text)">${totalC}人</div></div>
+        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px">客単価</div><div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--text)">${yen(Math.round(totalS/totalC))}</div></div>
+      </div>
+      <div style="margin-top:12px"><button class="btn btn-sec" style="font-size:11px;padding:6px 14px" onclick="nav('sales')">詳細を見る →</button></div>`;
+  }
+
+  // TX
+  const tagMap={food:'食材仕入',pack:'包材仕入',fixed:'固定費',salary:'給与',card:'カード',sale:'売上',unk:'未分類'};
+  const tagCls={food:'t-food',pack:'t-pack',fixed:'t-fixed',salary:'t-salary',card:'t-card',sale:'t-sale',unk:'t-unk'};
+  document.getElementById('dashTx').innerHTML=TX_DASH.map(t=>`
+    <tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">${t.d}</td>
+    <td style="font-size:12px">${t.v}</td>
+    <td><span class="tag ${tagCls[t.tag]}">${tagMap[t.tag]}</span></td>
+    <td class="r" style="color:${t.a<0?'var(--red)':'var(--accent)'}">${fmtAmt(t.a)}</td></tr>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// SALES ANALYSIS
+// ════════════════════════════════════════════════════════════════════════
+
+function renderSales() {
+  const data = airegiData;
+  document.getElementById('salesNoData').style.display = data ? 'none' : 'block';
+  document.getElementById('salesDashboard').style.display = data ? 'block' : 'none';
+  if(!data) return;
+
+  const totalS = data.reduce((s,d)=>s+d.sales,0);
+  const totalC = data.reduce((s,d)=>s+d.customers,0);
+  const totalCash = data.reduce((s,d)=>s+d.cash,0);
+  const totalCL   = data.reduce((s,d)=>s+d.cashless,0);
+  const totalItems = data.reduce((s,d)=>s+d.items,0);
+  const totalDisc  = data.reduce((s,d)=>s+d.discount,0);
+  const bizDays = data.length;
+  const maxDay = data.reduce((a,b)=>b.sales>a.sales?b:a);
+
+  document.getElementById('salesKpi').innerHTML=[
+    {l:'月間売上',v:yen(totalS),sub:'税込',cls:'green'},
+    {l:'営業日数',v:bizDays+'日',sub:`最高: ${maxDay.day}日 ${yen(maxDay.sales)}`},
+    {l:'総客数',  v:totalC+'人',sub:'客単価 '+yen(Math.round(totalS/totalC))},
+  ].map(k=>`<div class="kpi-mini"><div class="kpi-mini-lbl">${k.l}</div><div class="kpi-mini-val ${k.cls||''}">${k.v}</div><div class="kpi-mini-sub">${k.sub}</div></div>`).join('');
+
+  // Build full month (1-31)
+  const allDays=[];
+  for(let day=1;day<=31;day++){
+    const found=data.find(d=>d.day===day);
+    const date=new Date(2026,0,day);
+    const pyDow=(date.getDay()+6)%7;
+    allDays.push(found||{day,dow:pyDow,sales:0,closed:true});
+  }
+  const maxS2=Math.max(...data.map(d=>d.sales));
+  document.getElementById('salesPeriod').textContent='2026年1月';
+  document.getElementById('dailyBars').innerHTML=allDays.map(d=>{
+    const isSat=d.dow===5,isSun=d.dow===6;
+    const cls=d.closed?'closed':isSat?'saturday':isSun?'sunday':'weekday';
+    const h=d.sales>0?Math.max(3,d.sales/maxS2*118):2;
+    const lblCls=isSat?'sat':isSun?'sun':'wk';
+    return `<div class="day-col"><div class="day-tip">${d.day}日 ${d.sales>0?yen(d.sales):'休業'}</div>
+      <div class="day-bar-b ${cls}" style="height:${h}px"></div>
+      <div class="day-lbl-b ${lblCls}">${d.day}</div></div>`;
+  }).join('');
+
+  // DOW
+  const dowStats={};
+  for(let i=0;i<7;i++) dowStats[i]={days:[],total:0,avg:0};
+  data.forEach(r=>{dowStats[r.dow].days.push(r);dowStats[r.dow].total+=r.sales;});
+  for(let i=0;i<7;i++) if(dowStats[i].days.length) dowStats[i].avg=Math.round(dowStats[i].total/dowStats[i].days.length);
+  const maxAvg=Math.max(...Object.values(dowStats).map(s=>s.avg||0));
+  document.getElementById('dowGrid').innerHTML=[0,1,2,3,4,5,6].map(d=>{
+    const stat=dowStats[d];
+    if(!stat.days.length) return `<div class="dow-row"><div class="dow-lbl ${d===5?'sat':d===6?'sun':''}">${DOW_JP[d]}</div><div class="dow-bar-w"><div class="dow-bar-f" style="width:3%;background:var(--bg3)"></div></div><div class="dow-cnt">休</div></div>`;
+    const pct=stat.avg/maxAvg*100;
+    const color=d===5?'var(--sat)':d===6?'var(--red)':'var(--blue)';
+    return `<div class="dow-row"><div class="dow-lbl ${d===5?'sat':d===6?'sun':''}">${DOW_JP[d]}</div><div class="dow-bar-w"><div class="dow-bar-f" style="width:${pct}%;background:${color}">${yen(stat.avg)}</div></div><div class="dow-cnt">${stat.days.length}日</div></div>`;
+  }).join('');
+
+  // Donut
+  const cashPct=totalCash/(totalCash+totalCL);
+  const clPct=1-cashPct;
+  const cx=50,cy=50,r=38,ir=24;
+  function arc(pct,sa){
+    const sw=pct*Math.PI*2;
+    const x1=cx+r*Math.cos(sa),y1=cy+r*Math.sin(sa),x2=cx+r*Math.cos(sa+sw),y2=cy+r*Math.sin(sa+sw);
+    const ix1=cx+ir*Math.cos(sa),iy1=cy+ir*Math.sin(sa),ix2=cx+ir*Math.cos(sa+sw),iy2=cy+ir*Math.sin(sa+sw);
+    return `M${ix1},${iy1} L${x1},${y1} A${r},${r} 0 ${sw>Math.PI?1:0},1 ${x2},${y2} L${ix2},${iy2} A${ir},${ir} 0 ${sw>Math.PI?1:0},0 ${ix1},${iy1}`;
+  }
+  const a0=-Math.PI/2;
+  document.getElementById('payDonut').innerHTML=
+    `<path d="${arc(cashPct,a0)}" fill="var(--blue)" opacity=".85"/>
+     <path d="${arc(clPct,a0+cashPct*Math.PI*2)}" fill="var(--accent)" opacity=".85"/>
+     <text x="50" y="47" text-anchor="middle" fill="var(--text3)" font-size="8" font-family="DM Mono">現金</text>
+     <text x="50" y="57" text-anchor="middle" fill="var(--text)" font-size="9" font-family="DM Mono">${Math.round(cashPct*100)}%</text>`;
+  document.getElementById('payLabels').innerHTML=[
+    {l:'現金',v:totalCash,pct:cashPct,c:'var(--blue)'},
+    {l:'キャッシュレス',v:totalCL,pct:clPct,c:'var(--accent)'},
+  ].map(p=>`<div class="pay-label-item"><div class="pay-left"><div class="pay-dot" style="background:${p.c}"></div>${p.l}</div><div><span class="pay-right">${yen(p.v)}</span><span class="pay-pct-lbl">${Math.round(p.pct*100)}%</span></div></div>`).join('');
+
+  // Insights
+  const taxFree=Math.round(totalS/1.1);
+  document.getElementById('salesInsight').innerHTML=[
+    {l:'税抜売上',v:yen(taxFree),cls:'pos'},
+    {l:'日平均売上',v:yen(Math.round(totalS/bizDays)),cls:''},
+    {l:'1人あたり購入点数',v:(totalItems/totalC).toFixed(1)+'点',cls:''},
+    {l:'割引合計',v:yen(Math.abs(totalDisc)),cls:'neg'},
+  ].map(i=>`<div class="insight-item"><span class="ins-lbl">${i.l}</span><span class="ins-val ${i.cls}">${i.v}</span></div>`).join('');
+
+  // Detail table
+  const topDay=data.reduce((a,b)=>b.sales>a.sales?b:a);
+  function dowPill(d){
+    if(d===5) return `<span class="tag" style="background:var(--sat-l);color:var(--sat);border:1px solid rgba(90,64,144,.2)">土</span>`;
+    if(d===6) return `<span class="tag" style="background:var(--red-l);color:var(--red);border:1px solid rgba(176,64,48,.2)">日</span>`;
+    return `<span class="tag t-unk">${DOW_JP[d]}</span>`;
+  }
+  document.getElementById('salesDetailBody').innerHTML=data.map(d=>`
+    <tr class="${d.day===topDay.day?'highlight':''}">
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">1/${d.day}</td>
+      <td>${dowPill(d.dow)}</td>
+      <td class="r" style="${d.day===topDay.day?'color:var(--accent);font-weight:700':''}"> ${yen(d.sales)}</td>
+      <td class="r">${d.customers}</td>
+      <td class="r">${yen(Math.round(d.sales/d.customers))}</td>
+      <td class="r">${d.items}</td>
+      <td class="r" style="color:var(--text3)">${yen(d.cash)}</td>
+      <td class="r" style="color:var(--text3)">${yen(d.cashless)}</td>
+      <td class="r" style="color:${d.discount<0?'var(--red)':'var(--text3)'}">${d.discount<0?fmtAmt(d.discount):'-'}</td>
+    </tr>`).join('');
+  document.getElementById('salesDetailFoot').innerHTML=`<tr>
+    <td colspan="2">合計 / 平均</td>
+    <td class="r" style="color:var(--accent2)">${yen(totalS)}</td>
+    <td class="r">${totalC}</td>
+    <td class="r">${yen(Math.round(totalS/totalC))}</td>
+    <td class="r">${totalItems}</td>
+    <td class="r">${yen(totalCash)}</td>
+    <td class="r">${yen(totalCL)}</td>
+    <td class="r" style="color:var(--red)">${fmtAmt(totalDisc)}</td></tr>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// 仕入台帳
+// ════════════════════════════════════════════════════════════════════════
+
+function renderShiire() {
+  document.getElementById('shiireBadge').textContent=document.getElementById('monthSel').value;
+  const d=new Date(); document.getElementById('s-date').value=d.toISOString().split('T')[0];
+  renderShiireTable();
+}
+function renderShiireTable() {
+  const total=shiireData.reduce((s,r)=>s+r.amount,0);
+  document.getElementById('shiireTotal').textContent=yen(total);
+  const cc={'食材':'t-food','包材':'t-pack','道具':'t-pack','その他':'t-unk'};
+  document.getElementById('shiireTable').innerHTML=[...shiireData].reverse().map((r,ri)=>`
+    <tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">${r.date}</td>
+    <td>${r.vendor}</td>
+    <td><span class="tag ${cc[r.cat]||'t-unk'}">${r.cat}</span></td>
+    <td class="r">${yen(r.amount)}</td>
+    <td style="color:var(--text3);font-size:11px">${r.memo}</td>
+    <td><button class="action-btn del-btn" onclick="delShiire(${shiireData.length-1-ri})">削除</button></td>
+    </tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px">まだ入力がありません</td></tr>';
+}
+function addShiire() {
+  const date=document.getElementById('s-date').value;
+  const vendor=document.getElementById('s-vendor').value;
+  const amount=parseFloat(document.getElementById('s-amount').value)||0;
+  const cat=document.getElementById('s-cat').value;
+  const memo=document.getElementById('s-memo').value;
+  if(!amount){showToast('金額を入力してください');return;}
+  const p=date.split('-');
+  shiireData.push({date:`${parseInt(p[1])}/${parseInt(p[2])}`,vendor,amount,cat,memo});
+  saveLS('ls_shiire',shiireData);
+  document.getElementById('s-amount').value='';
+  document.getElementById('s-memo').value='';
+  renderShiireTable();
+  showToast('✓ 追加しました');
+}
+function delShiire(idx) { shiireData.splice(idx,1); saveLS('ls_shiire',shiireData); renderShiireTable(); }
+
+// ════════════════════════════════════════════════════════════════════════
+// 棚卸
+// ════════════════════════════════════════════════════════════════════════
+
+function renderTana() { renderTanaTabs(); showTanaTab(curTanaTab); updateProgress(); updateTanaMonthLabel(); }
+function renderTanaTabs() {
+  document.getElementById('tanaTabs').innerHTML=SHEETS.map((sh,i)=>{
+    const filled=sh.items.filter(it=>stocks[it.id]!==undefined).length;
+    const done=filled===sh.items.length&&sh.items.length>0;
+    return `<div class="ttab ${i===curTanaTab?'active':''}" id="ttab-${i}" onclick="showTanaTab(${i})">${sh.name}<span class="tc">${filled}/${sh.items.length}</span>${done?'<span class="tdone">✓</span>':''}</div>`;
+  }).join('');
+}
+function showTanaTab(idx) {
+  curTanaTab=idx; openCard=null;
+  document.querySelectorAll('.ttab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  renderTanaContent(idx);
+  document.getElementById('ttab-'+idx)?.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+}
+function renderTanaContent(idx) {
+  const sh=SHEETS[idx];
+  const changes=sh.items.filter(i=>i.price!==i.prevPrice);
+  const filled=sh.items.filter(i=>stocks[i.id]!==undefined).length;
+  const total=calcSheetTotal(idx);
+  let html='';
+  if(changes.length>0) html+=`<div class="price-banner">⚠️ 単価変動 <strong>${changes.length}件</strong></div>`;
+  html+=`<div class="ts-card"><div><div class="ts-label">今月棚卸金額</div><div class="ts-val">${yen(total)}</div></div><div class="ts-cnt"><span>${filled}</span>/${sh.items.length} 品入力済み</div></div>
+  <div class="srch-wrap"><span class="srch-ico">🔍</span><input class="srch-inp" type="search" placeholder="品目を検索..." oninput="filterTana(this.value)" autocomplete="off"></div>
+  <div id="itemList">${sh.items.map(item=>itemCardHTML(item)).join('')}</div>`;
+  document.getElementById('tanaContent').innerHTML=html;
+}
+function itemCardHTML(item) {
+  const s=stocks[item.id];
+  const hasVal=s!==undefined;
+  const prevStock = (s && s.prevStock !== undefined) ? s.prevStock : null;
+  const stockVal=hasVal?s.stock:'';
+  const priceVal=(hasVal&&s.price!==undefined)?s.price:item.price;
+  const diff=item.price-item.prevPrice;
+  const isOpen=openCard===item.id;
+  const amount=hasVal?calcItemAmount(item,s.stock):0;
+  const badge=diff>0?`<span class="up-badge">↑+${diff.toLocaleString()}</span>`:diff<0?`<span class="dn-badge">↓${diff.toLocaleString()}</span>`:'';
+  return `<div class="item-card ${hasVal?'has-val':''} ${diff!==0?'price-chg':''} ${isOpen?'open':''}" id="card-${item.id}">
+    <div class="item-main" onclick="toggleCard('${item.id}')">
+      <div class="ichk">${hasVal?'✓':''}</div>
+      <div class="iinfo"><div class="iname">${item.name}</div>
+        <div class="imeta"><span class="ipricemono">${itemUnitPriceLabel(item)}</span>${badge}</div>
+      </div>
+      <div class="iright">
+        <div class="istock-cols">
+          ${prevStock!==null?`
+          <div class="istock-col">
+            <div class="istock-col-lbl">期首</div>
+            <div class="istock is-prev">${prevStock}</div>
+            <div class="iunit">${tanaDisplayUnit(item)}</div>
+          </div>
+          <div class="istock-divider"></div>
+          `:''}
+          <div class="istock-col">
+            ${prevStock!==null?'<div class="istock-col-lbl">当月</div>':''}
+            <div class="istock">${hasVal?s.stock:'−'}</div>
+            <div class="iunit">${item.unit}</div>
+          </div>
+        </div>
+        ${hasVal?`<div class="iamt">${yen(amount)}</div>`:''}
+      </div>
+    </div>
+    <div class="input-panel">
+      ${prevStock!==null?`<div class="prev-stock-row"><span class="prev-stock-lbl">期首（前月末）</span><span class="prev-stock-val">${prevStock} ${tanaDisplayUnit(item)}</span></div>`:''}
+      <div class="quick-nums">${[0,0.5,1,2,3,5,10].map(n=>`<div class="qn" onclick="setStock('${item.id}',${n})">${n}</div>`).join('')}</div>
+      <div class="inp-row"><div class="inp-lbl">${tanaDisplayUnit(item)}</div>
+        <div class="qty-wrap">
+          <button class="qty-btn" onclick="adjStock('${item.id}',-0.5)">−</button>
+          <input class="stock-inp" type="number" id="si-${item.id}" value="${stockVal}" placeholder="0" step="0.1" min="0" oninput="onStockIn('${item.id}',this.value)" inputmode="decimal">
+          <button class="qty-btn" onclick="adjStock('${item.id}',0.5)">＋</button>
+        </div>
+      </div>
+      <div class="inp-row"><div class="inp-lbl">仕入単価</div><input class="price-inp-s" type="number" id="pi-${item.id}" value="${priceVal}" step="1" oninput="onPriceIn('${item.id}',this.value)" inputmode="numeric"></div>
+      <div class="inp-row"><div class="inp-lbl">単位</div><input class="unit-inp-s" type="text" id="ui-${item.id}" value="${item.unit}" onchange="onUnitChange('${item.id}',this.value)"></div>
+      <div class="inp-subtotal"><div class="sub-lbl">小計</div><div class="sub-val" id="sub-${item.id}">${hasVal?yen(amount):'¥0'}</div></div>
+    </div>
+  </div>`;
+}
+function toggleCard(id) {
+  if(openCard===id){openCard=null;document.getElementById('card-'+id)?.classList.remove('open');}
+  else{if(openCard)document.getElementById('card-'+openCard)?.classList.remove('open');openCard=id;document.getElementById('card-'+id)?.classList.add('open');setTimeout(()=>{const el=document.getElementById('si-'+id);if(el){el.focus();el.select();}},60);}
+}
+function setStock(id,val){const item=findItem(id);if(!item)return;if(!stocks[id])stocks[id]={stock:val,price:item.price};else stocks[id].stock=val;document.getElementById('si-'+id).value=val;updateSub(id);refreshCard(id);saveLS('ls_stocks',stocks);}
+function adjStock(id,delta){const item=findItem(id);if(!item)return;const cur=stocks[id]?.stock??0;const nv=Math.max(0,Math.round((cur+delta)*10)/10);if(!stocks[id])stocks[id]={stock:nv,price:item.price};else stocks[id].stock=nv;document.getElementById('si-'+id).value=nv;updateSub(id);refreshCard(id);saveLS('ls_stocks',stocks);}
+function onStockIn(id,val){const num=parseFloat(val);if(isNaN(num))return;const item=findItem(id);if(!stocks[id])stocks[id]={stock:num,price:item.price};else stocks[id].stock=num;updateSub(id);refreshCard(id);saveLS('ls_stocks',stocks);}
+function onPriceIn(id,val){const num=parseFloat(val);if(isNaN(num))return;const item=findItem(id);if(!stocks[id])stocks[id]={stock:0,price:num};else stocks[id].price=num;if(item)item.price=num;saveLS('ls_sheets',SHEETS);updateSub(id);saveLS('ls_stocks',stocks);}
+function onUnitChange(id,val){const item=findItem(id);if(item){item.unit=val;saveLS('ls_sheets',SHEETS);}showToast('✓ 単位を更新しました');}
+function updateSub(id){const s=stocks[id];if(!s)return;const item=findItem(id);const el=document.getElementById('sub-'+id);if(el&&item)el.textContent=yen(calcItemAmount(item,s.stock));}
+function refreshCard(id){const card=document.getElementById('card-'+id);if(!card)return;const s=stocks[id];const item=findItem(id);if(s&&s.stock!==undefined&&item){card.classList.add('has-val');const disp=card.querySelector('.istock');if(disp)disp.textContent=s.stock;const chk=card.querySelector('.ichk');if(chk)chk.textContent='✓';const a=calcItemAmount(item,s.stock);const amt=card.querySelector('.iamt');if(amt)amt.textContent=yen(a);else{const r=card.querySelector('.iright');if(r)r.insertAdjacentHTML('beforeend',`<div class="iamt">${yen(a)}</div>`);}}updateProgress();updateTanaTabCounts();}
+function filterTana(q){const sh=SHEETS[curTanaTab];const list=document.getElementById('itemList');if(!list)return;list.innerHTML=sh.items.filter(i=>i.name.includes(q)).map(i=>itemCardHTML(i)).join('');}
+function findItem(id){for(const sh of SHEETS)for(const item of sh.items)if(item.id===id)return item;return null;}
+// 品目の棚卸金額を計算（入り数があれば単価割り算）
+// qty あり（ケーキ箱50枚）: 入力値は枚数 → 金額 = 入力数 × (仕入単価 ÷ 入り数)
+// qty なし（いちご）      : 入力値は仕入単位 → 金額 = 入力数 × 仕入単価
+// tanaUnit が設定されている = 棚卸は個数単位（枚・本など）で入力
+// その場合の金額: 入力数 × (仕入単価 ÷ 入り数)
+// tanaUnit なし = 仕入単位のまま（袋・セットなど）
+// その場合の金額: 入力数 × 仕入単価
+function calcItemAmount(item, stockVal) {
+  const price = stocks[item.id]?.price ?? item.price;
+  if(item.tanaUnit && item.qty && item.qty > 0) {
+    // 棚卸単位で入力 → 1棚卸単位あたりの単価で計算
+    return stockVal * (price / item.qty);
+  }
+  return stockVal * price;
+}
+
+// 棚卸カードの単価表示
+function itemUnitPriceLabel(item) {
+  const price = stocks[item.id]?.price ?? item.price;
+  if(item.tanaUnit && item.qty && item.qty > 0) {
+    const unitP = price / item.qty;
+    const fmt = unitP < 1 ? unitP.toFixed(3) : unitP < 10 ? unitP.toFixed(2) : unitP < 100 ? unitP.toFixed(1) : Math.round(unitP).toLocaleString();
+    return `¥${fmt} / ${item.unitLabel||item.tanaUnit}`;
+  }
+  return `¥${price.toLocaleString()} / ${item.unit}`;
+}
+
+// 棚卸入力時に表示する単位
+function tanaDisplayUnit(item) {
+  return item.tanaUnit || item.unit;
+}
+
+function calcSheetTotal(idx){return SHEETS[idx].items.reduce((s,item)=>{const st=stocks[item.id];return s+(st&&st.stock!==undefined?calcItemAmount(item,st.stock):0);},0);}
+function calcGrandTotal(){return SHEETS.reduce((s,_,i)=>s+calcSheetTotal(i),0);}
+function updateProgress(){let total=0,filled=0;SHEETS.forEach(sh=>{total+=sh.items.length;filled+=sh.items.filter(i=>stocks[i.id]!==undefined).length;});const pct=total>0?Math.round(filled/total*100):0;document.getElementById('progText').textContent=`${filled} / ${total} 品`;document.getElementById('progPct').textContent=pct+'%';document.getElementById('progFill').style.width=pct+'%';}
+function updateTanaTabCounts(){SHEETS.forEach((sh,i)=>{const filled=sh.items.filter(item=>stocks[item.id]!==undefined).length;const tab=document.getElementById('ttab-'+i);if(!tab)return;const tc=tab.querySelector('.tc');if(tc)tc.textContent=`${filled}/${sh.items.length}`;const done=filled===sh.items.length&&sh.items.length>0;const td=tab.querySelector('.tdone');if(done&&!td)tab.insertAdjacentHTML('beforeend','<span class="tdone">✓</span>');else if(!done&&td)td.remove();});}
+
+// ── 月末確定・期首引継ぎ ──────────────────────────────────────
+
+
+function startNextMonth() {
+  // 今月確定済み（prevStockが設定済み）か確認
+  const confirmed = Object.values(stocks).some(s => s && s.prevStock !== undefined);
+  if(!confirmed) {
+    if(!confirm('まだ「今月確定」が押されていません。\n棚卸ページの「📅 今月確定」を先に押すことをお勧めします。\n\nこのまま翌月を開始しますか？')) return;
+  } else {
+    if(!confirm('翌月の棚卸を開始します。\n\n・今月確定の在庫数 → 翌月の期首に引継ぎ\n・当月の棚卸入力はクリア\n\nよろしいですか？')) return;
+  }
+
+  // 現在の stock を prevStock として保存し、stock 自体はクリア
+  Object.keys(stocks).forEach(id => {
+    const s = stocks[id];
+    if(!s) return;
+    // prevStock = 今の stock（今月確定済みなら既に正しい値）
+    const keepPrev = s.prevStock !== undefined ? s.prevStock : (s.stock ?? 0);
+    stocks[id] = { prevStock: keepPrev };
+    // price は DEFAULT_SHEETS から取るのでここでは保持しない
+  });
+
+  saveLS('ls_stocks', stocks);
+  saveLS('ls_airegi', null);  // 売上データもリセット（月が変わるため）
+
+  // 月セレクタを翌月に進める
+  const sel = document.getElementById('monthSel');
+  if(sel && sel.value) {
+    const [y, m] = sel.value.split('/').map(Number);
+    const nextM = m === 12 ? 1 : m + 1;
+    const nextY = m === 12 ? y + 1 : y;
+    const nextVal = `${nextY}/${String(nextM).padStart(2,'0')}`;
+    // 選択肢に翌月がなければ追加
+    let opt = Array.from(sel.options).find(o => o.value === nextVal);
+    if(!opt) {
+      opt = document.createElement('option');
+      opt.value = nextVal;
+      opt.textContent = `${nextY}年${nextM}月`;
+      sel.insertBefore(opt, sel.options[0]);
+    }
+    sel.value = nextVal;
+    onMonthChange(nextVal);
+  }
+
+  renderTana();
+  showToast('✓ 翌月の棚卸を開始しました。期首在庫が引き継がれています。');
+  nav('tana');
+}
+
+function confirmMonthEnd() {
+  const month = document.getElementById('monthSel').value;
+  const entered = Object.keys(stocks).length;
+  if(entered === 0) { showToast('棚卸データがありません'); return; }
+  if(!confirm(`${month} の棚卸を確定して\n翌月の期首在庫に引き継ぎますか？\n\n入力済み品目: ${entered}品目`)) return;
+
+  // 現在の在庫数を prevStock（期首）として保存
+  Object.keys(stocks).forEach(id => {
+    if(stocks[id] && stocks[id].stock !== undefined) {
+      stocks[id].prevStock = stocks[id].stock;
+    }
+  });
+  saveLS('ls_stocks', stocks);
+
+  // 月次スナップショットも自動保存（GAS連携があれば）
+  const gasUrl = getGasUrl();
+  if(gasUrl) {
+    saveMonthSnapshot().catch(e => console.warn(e));
+  }
+
+  // 表示更新
+  renderTana();
+  showToast(`✓ ${month} 確定！翌月の期首在庫に引き継ぎました`);
+  updateTanaMonthLabel();
+}
+
+function updateTanaMonthLabel() {
+  const el = document.getElementById('tanaMonthLabel');
+  if(!el) return;
+  const hasAny = Object.values(stocks).some(s => s && s.prevStock !== undefined);
+  el.textContent = hasAny ? '（期首あり）' : '';
+}
+
+function saveAll(){saveLS('ls_stocks',stocks);saveLS('ls_sheets',SHEETS);updateProgress();updateTanaTabCounts();renderTanaTabs();showToast(`✓ 保存しました  合計 ${yen(calcGrandTotal())}`);}
+
+// ════════════════════════════════════════════════════════════════════════
+// 月次集計 & 固定費管理
+// ════════════════════════════════════════════════════════════════════════
+
+const DEFAULT_FIXED_COSTS = [
+  {id:'fc1', name:'家賃',       amount:65120},
+  {id:'fc2', name:'リース料',   amount:31636},
+  {id:'fc3', name:'返済',       amount:36043},
+  {id:'fc4', name:'電気代',     amount:16943},
+  {id:'fc5', name:'ガス代',     amount:7542},
+  {id:'fc6', name:'インターネット', amount:4317},
+  {id:'fc7', name:'ゴミ処理代', amount:7865},
+  {id:'fc8', name:'保険料',     amount:2000},
+  {id:'fc9', name:'基本給',     amount:14330},
+  {id:'fc10',name:'ヤマト送料', amount:825},
+];
+
+let fixedCosts = loadLS('ls_fixed_costs', JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
+
+function renderMonthly() {
+  document.getElementById('monthlyBadge').textContent = document.getElementById('monthSel').value;
+  const tanaTotal   = calcGrandTotal();
+  const shiireTotal = shiireData.reduce((s,r) => s+r.amount, 0);
+  const ar          = airegiData;
+  const totalSales  = ar ? ar.reduce((s,d) => s+d.sales, 0) : 688420;
+  const rawCost     = shiireTotal || 312840;
+  const grossProfit = totalSales - rawCost;
+  const fixedTotal  = fixedCosts.reduce((s,r) => s+r.amount, 0);
+  const teNokori    = grossProfit - fixedTotal;
+  const shohizei    = Math.round(totalSales / 11);
+  const taxRate     = parseFloat(document.getElementById('taxRateSel')?.value || '0.20');
+  const shotokuTax  = Math.round(Math.max(0, teNokori) * taxRate);
+  const jissitsu    = teNokori - shohizei - shotokuTax;
+
+  // KPI row
+  document.getElementById('monthlyKpi').innerHTML = [
+    {l:'税込売上',  v:yen(totalSales),   cls:'k-green', sub: ar?'Airレジ実データ':'推定値'},
+    {l:'原価合計',  v:yen(rawCost),      cls:'k-red',   sub:'仕入台帳より'},
+    {l:'粗利益',    v:yen(grossProfit),  cls:'k-blue',  sub:'売上−原価'},
+    {l:'固定費合計',v:yen(fixedTotal),   cls:'k-yellow',sub:'編集可'},
+  ].map(k=>`<div class="kpi ${k.cls}" style="grid-column:auto"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  // Left: 売上・原価 (auto)
+  const leftItems = [
+    {l:'税込売上',    v:yen(totalSales),                   bold:false},
+    {l:'（消費税）',  v:yen(Math.round(totalSales/11)),    bold:false, sub:true},
+    {l:'税抜売上',    v:yen(Math.round(totalSales/1.1)),   bold:false},
+    null,
+    {l:'期首在庫',    v:'¥271,870',                        bold:false},
+    {l:'当月仕入合計',v:yen(rawCost),                      bold:false},
+    {l:'期末在庫',    v:yen(tanaTotal),                    bold:false},
+    {l:'原価合計',    v:yen(rawCost),                      bold:true},
+    null,
+    {l:'粗利益',      v:yen(grossProfit),                  bold:true, accent:true},
+  ];
+  document.getElementById('monthlyLeftRows').innerHTML = leftItems.map(r => {
+    if(!r) return '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">';
+    return `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(212,207,195,.4);font-size:12px;${r.bold?'font-weight:700':''}">
+      <span style="color:${r.sub?'var(--text3)':'var(--text2)'}">${r.l}</span>
+      <span style="font-family:'DM Mono',monospace;color:${r.accent?'var(--accent2)':''}">${r.v}</span>
+    </div>`;
+  }).join('');
+
+  // Right: 固定費 (editable)
+  renderFixedCostRows();
+
+  // 手残り・税計算表示
+  updateTaxDisplay(teNokori, shohizei, shotokuTax, jissitsu);
+}
+
+function updateTaxDisplay(teNokori, shohizei, shotokuTax, jissitsu) {
+  const te = document.getElementById('monthlyTeNokori');
+  const sh = document.getElementById('monthlyShohizei');
+  const tx = document.getElementById('monthlyTax');
+  const ji = document.getElementById('monthlyJissitsu');
+  const taxRate = parseFloat(document.getElementById('taxRateSel')?.value || '0.20');
+  const lbl = document.getElementById('monthlyTaxRateLabel');
+  if(te) { te.textContent = yen(teNokori); te.style.color = teNokori>=0?'var(--text)':'var(--red)'; }
+  if(sh) sh.textContent = '−' + yen(shohizei);
+  if(tx) tx.textContent = '−' + yen(shotokuTax);
+  if(lbl) lbl.textContent = `手残り×${Math.round(taxRate*100)}%`;
+  if(ji) { ji.textContent = yen(jissitsu); ji.style.color = jissitsu>=0?'var(--accent2)':'var(--red)'; }
+}
+
+function onTaxRateChange() { renderMonthly(); }
+
+function renderFixedCostRows() {
+  const fixedTotal = fixedCosts.reduce((s,r) => s+r.amount, 0);
+  document.getElementById('fixedCostRows').innerHTML = fixedCosts.map(r => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(212,207,195,.4)">
+      <span style="font-size:12px;color:var(--text2);flex:1">${r.name}</span>
+      <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text);margin-right:10px">${yen(r.amount)}</span>
+      <div style="display:flex;gap:4px">
+        <button class="action-btn edit-btn" onclick="openEditFixedCost('${r.id}')">編集</button>
+        <button class="action-btn del-btn"  onclick="deleteFixedCost('${r.id}')">削除</button>
+      </div>
+    </div>`).join('') || '<div style="color:var(--text3);font-size:12px;padding:12px 0;text-align:center">項目がありません</div>';
+  document.getElementById('fixedCostTotal').textContent = yen(fixedTotal);
+
+  // Recalculate 手残り・税
+  const ar2 = airegiData;
+  const totalSales2 = ar2 ? ar2.reduce((s,d)=>s+d.sales,0) : 688420;
+  const shiireTotal2 = shiireData.reduce((s,r)=>s+r.amount,0);
+  const grossProfit2 = totalSales2 - (shiireTotal2 || 312840);
+  const teNokori2   = grossProfit2 - fixedTotal;
+  const shohizei2   = Math.round(totalSales2 / 11);
+  const taxRate2    = parseFloat(document.getElementById('taxRateSel')?.value || '0.20');
+  const shotokuTax2 = Math.round(Math.max(0, teNokori2) * taxRate2);
+  const jissitsu2   = teNokori2 - shohizei2 - shotokuTax2;
+  updateTaxDisplay(teNokori2, shohizei2, shotokuTax2, jissitsu2);
+}
+
+function openFixedCostModal() {
+  document.getElementById('fcModalTitle').textContent = '固定費を追加';
+  document.getElementById('fc-name').value   = '';
+  document.getElementById('fc-amount').value = '';
+  document.getElementById('fc-edit-id').value = '';
+  document.getElementById('fixedCostModalOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('fc-name').focus(), 80);
+}
+function openEditFixedCost(id) {
+  const item = fixedCosts.find(r=>r.id===id); if(!item) return;
+  document.getElementById('fcModalTitle').textContent = '固定費を編集';
+  document.getElementById('fc-name').value   = item.name;
+  document.getElementById('fc-amount').value = item.amount;
+  document.getElementById('fc-edit-id').value = id;
+  document.getElementById('fixedCostModalOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('fc-name').focus(), 80);
+}
+function closeFixedCostModal() {
+  document.getElementById('fixedCostModalOverlay').classList.remove('open');
+}
+function saveFixedCost() {
+  const name   = document.getElementById('fc-name').value.trim();
+  const amount = parseFloat(document.getElementById('fc-amount').value) || 0;
+  const editId = document.getElementById('fc-edit-id').value;
+  if(!name) { showToast('項目名を入力してください'); return; }
+  if(editId) {
+    const item = fixedCosts.find(r=>r.id===editId);
+    if(item) { item.name = name; item.amount = amount; }
+  } else {
+    fixedCosts.push({ id:'fc'+Date.now(), name, amount });
+  }
+  saveLS('ls_fixed_costs', fixedCosts);
+  closeFixedCostModal();
+  renderFixedCostRows();
+  showToast(editId ? '✓ 更新しました' : '✓ 追加しました');
+}
+function deleteFixedCost(id) {
+  if(!confirm('この項目を削除しますか？')) return;
+  fixedCosts = fixedCosts.filter(r=>r.id!==id);
+  saveLS('ls_fixed_costs', fixedCosts);
+  renderFixedCostRows();
+  showToast('削除しました');
+}
+
+
+// ════════════════════════════════════════════════════════════════════════
+// 伝票 AI読取
+// ════════════════════════════════════════════════════════════════════════
+
+function handleInvoiceFile(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const original = e.target.result;
+    try {
+      const img = new Image();
+      img.onerror = () => {
+        // 画像読み込み失敗 → 圧縮なしでそのまま使う
+        invImgB64 = original.split(',')[1];
+        invImgType = file.type || 'image/jpeg';
+        document.getElementById('previewImg').src = original;
+        document.getElementById('uploadZone').style.display = 'none';
+        hideInvoiceStates();
+        document.getElementById('previewWrap').classList.add('show');
+      };
+      img.onload = () => {
+        try {
+          const MAX = 1600;
+          let w = img.width, h = img.height;
+          if(w > MAX || h > MAX) {
+            if(w > h) { h = Math.round(h * MAX / w); w = MAX; }
+            else       { w = Math.round(w * MAX / h); h = MAX; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const compressed = canvas.toDataURL('image/jpeg', 0.82);
+          invImgB64 = compressed.split(',')[1];
+          invImgType = 'image/jpeg';
+          document.getElementById('previewImg').src = compressed;
+        } catch(compressErr) {
+          // Canvas圧縮失敗 → 元画像をそのまま使う
+          invImgB64 = original.split(',')[1];
+          invImgType = file.type || 'image/jpeg';
+          document.getElementById('previewImg').src = original;
+        }
+        document.getElementById('uploadZone').style.display = 'none';
+        hideInvoiceStates();
+        document.getElementById('previewWrap').classList.add('show');
+      };
+      img.src = original;
+    } catch(err) {
+      // 万が一の保険
+      invImgB64 = original.split(',')[1];
+      invImgType = file.type || 'image/jpeg';
+      document.getElementById('previewImg').src = original;
+      document.getElementById('uploadZone').style.display = 'none';
+      hideInvoiceStates();
+      document.getElementById('previewWrap').classList.add('show');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+function resetInvoice(){invImgB64=null;document.getElementById('fileInput').value='';document.getElementById('previewWrap').classList.remove('show');document.getElementById('uploadZone').style.display='block';hideInvoiceStates();}
+function resetInvoiceAll(){resetInvoice();document.getElementById('invSuccess').classList.remove('show');}
+function hideInvoiceStates(){document.getElementById('analyzingState').classList.remove('show');document.getElementById('invoiceResult').classList.remove('show');const _ed=document.getElementById('invoiceError');if(_ed)_ed.style.display='none';document.getElementById('invSuccess').classList.remove('show');}
+
+async function analyzeInvoice() {
+  if(!invImgB64) return;
+  document.getElementById('previewWrap').classList.remove('show');
+  document.getElementById('analyzingState').classList.add('show');
+  const steps=['an1','an2','an3','an4'];
+  steps.forEach(s=>{document.getElementById(s).classList.remove('done','active');});
+  let si=0;
+  const timer=setInterval(()=>{
+    if(si>0){document.getElementById(steps[si-1]).classList.remove('active');document.getElementById(steps[si-1]).classList.add('done');document.getElementById(steps[si-1]).querySelector('.an-step-ico').textContent='✓';}
+    if(si<steps.length){document.getElementById(steps[si]).classList.add('active');si++;}
+    else clearInterval(timer);
+  },700);
+  const apiKey = getApiKey();
+  if(!apiKey) {
+    clearInterval(timer);
+    document.getElementById('analyzingState').classList.remove('show');
+    document.getElementById('previewWrap').classList.add('show');
+    openApiKeyModal();
+    showToast('🔑 先にAPIキーを設定してください');
+    return;
+  }
+  const gasUrl = getGasUrl();
+  if(!gasUrl) {
+    clearInterval(timer);
+    document.getElementById('analyzingState').classList.remove('show');
+    document.getElementById('previewWrap').classList.add('show');
+    showToast('⚠️ 設定画面でGAS URLを設定してください（GASセットアップが必要です）', 5000);
+    return;
+  }
+
+  try {
+    const res = await fetch(gasUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action:'invoiceOcr', apiKey, imageBase64:invImgB64, mediaType:invImgType })
+    });
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.error||'GASエラー');
+    const result = data.result;
+    if(!result || !result.items) throw new Error('解析結果の形式が正しくありません');
+
+    clearInterval(timer);
+    steps.forEach(s=>{document.getElementById(s).classList.remove('active');document.getElementById(s).classList.add('done');document.getElementById(s).querySelector('.an-step-ico').textContent='✓';});
+    await new Promise(r=>setTimeout(r,300));
+    document.getElementById('analyzingState').classList.remove('show');
+    showInvoiceResult(result);
+  } catch(e) {
+    clearInterval(timer);
+    document.getElementById('analyzingState').classList.remove('show');
+    document.getElementById('previewWrap').classList.add('show');
+    // スマホでも見えるようにトーストに詳細表示
+    const msg = e.message || '不明なエラー';
+    showToast('⚠️ ' + msg, 6000);
+    // 画面にもエラー内容を表示
+    const errDiv = document.getElementById('invoiceError');
+    if(errDiv) { errDiv.textContent = 'エラー詳細: ' + msg; errDiv.style.display='block'; }
+    console.error(e);
+  }
+}
+
+// Find master item by name (fuzzy: normalize spaces, ignore case)
+function findMasterByName(name) {
+  const norm = s => s.replace(/\s+/g,'').toLowerCase();
+  for(const sh of SHEETS)
+    for(const item of sh.items)
+      if(norm(item.name)===norm(name)) return item;
+  for(const sh of SHEETS)
+    for(const item of sh.items)
+      if(norm(name).includes(norm(item.name))||norm(item.name).includes(norm(name))) return item;
+  return null;
+}
+
+// ── 伝票編集テーブル ──────────────────────────────────────────
+
+function getMasterCandidates(name) {
+  const norm = s => s.replace(/\s+/g,'').toLowerCase();
+  const n = norm(name);
+  const results = [];
+  for(const sh of SHEETS)
+    for(const item of sh.items) {
+      const m = norm(item.name);
+      if(m === n) return [item];
+      if(m.includes(n) || n.includes(m)) results.push(item);
+    }
+  return results.slice(0, 5);
+}
+
+function renderInvTable() {
+  const unmatch = invItems.filter(i => !i._master).length;
+  const badge = document.getElementById('invUnmatchBadge');
+  if(badge) {
+    if(unmatch > 0) { badge.textContent = `⚠️ マスタ未照合 ${unmatch}件`; badge.style.display='inline'; }
+    else badge.style.display='none';
+  }
+  document.getElementById('invTableBody').innerHTML = invItems.map((item, i) => {
+    const noMaster  = !item._master;
+    const changed   = item._priceChanged;
+    const diff      = changed ? item.unitPrice - item._masterPrice : 0;
+    const candidates = noMaster ? getMasterCandidates(item.name) : [];
+    const rowStyle = noMaster
+      ? 'background:#fff5f5;outline:1.5px solid var(--red);outline-offset:-1px;border-radius:6px'
+      : changed ? 'background:var(--yellow-l)' : '';
+    const nameBadge = noMaster
+      ? `<div style="font-size:10px;color:var(--red);margin-top:3px;font-weight:500">⚠️ マスタに見つかりません</div>`
+      : `<div style="font-size:10px;color:var(--accent);margin-top:2px">✓ ${item._master.name}</div>`;
+    const candidateHint = noMaster && candidates.length > 0
+      ? `<div style="margin-top:4px;font-size:10px;color:var(--text3)">候補:
+          ${candidates.map(c =>
+            `<span onclick="invItems[${i}].name='${c.name.replace(/'/g,"\\'")}';rerenderInvRow(${i})" style="cursor:pointer;color:var(--accent2);text-decoration:underline;margin-left:4px">${c.name}</span>`
+          ).join('')}
+        </div>`
+      : '';
+    const diffBadge = changed
+      ? `<span style="font-size:10px;padding:1px 6px;border-radius:20px;margin-left:4px;${diff>0?'background:#fef3f0;color:var(--red);border:1px solid #f5c8c0':'background:var(--blue-l);color:var(--blue);border:1px solid #c0d8e8'}">${diff>0?'↑':'↓'}${Math.abs(diff).toLocaleString()}</span>`
+      : '';
+    return `<tr id="inv-row-${i}" style="${rowStyle}">
+      <td>
+        <input class="ei" value="${item.name.replace(/"/g,'&quot;')}"
+          oninput="invItems[${i}].name=this.value;rerenderInvRow(${i})"
+          style="min-width:110px;${noMaster?'border-color:var(--red)':''}">
+        ${nameBadge}${candidateHint}
+      </td>
+      <td><input class="ei" type="number" value="${item.qty}"
+        oninput="invItems[${i}].qty=parseFloat(this.value)||0;invItems[${i}].amount=(invItems[${i}].qty*(invItems[${i}].unitPrice||0));updateInvRowAmount(${i})"
+        style="width:55px;text-align:center"></td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;text-align:right">
+        ${changed
+          ? `<span style="color:var(--text3);text-decoration:line-through;font-size:10px">¥${item._masterPrice.toLocaleString()}</span><br><span style="color:var(--red);font-weight:700">¥${item.unitPrice.toLocaleString()}</span>${diffBadge}`
+          : `<input class="ei" type="number" value="${item.unitPrice||0}"
+              oninput="invItems[${i}].unitPrice=parseFloat(this.value)||0;invItems[${i}].amount=(invItems[${i}].qty||0)*(invItems[${i}].unitPrice||0);updateInvRowAmount(${i})"
+              style="width:72px;text-align:right">`
+        }
+      </td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;text-align:right;font-weight:500" id="inv-amt-${i}">¥${(item.amount||0).toLocaleString()}</td>
+      <td><select class="cat-sel" onchange="invItems[${i}].category=this.value" style="min-width:68px">
+        <option ${item.category==='食材'?'selected':''}>食材</option>
+        <option ${item.category==='包材'?'selected':''}>包材</option>
+        <option ${item.category==='その他'?'selected':''}>その他</option>
+      </select></td>
+      <td style="text-align:center">
+        <button onclick="removeInvRow(${i})" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:2px 6px" title="削除">×</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function rerenderInvRow(i) {
+  const item = invItems[i];
+  const master = findMasterByName(item.name);
+  item._master = master || null;
+  item._masterPrice = master ? master.price : null;
+  item._priceChanged = master && item.unitPrice > 0 && item.unitPrice !== master.price;
+  renderInvTable();
+  updateInvSummary(_lastVendor);
+}
+
+function updateInvRowAmount(i) {
+  const el = document.getElementById('inv-amt-'+i);
+  if(el) el.textContent = '¥' + (invItems[i].amount||0).toLocaleString();
+  updateInvSummary(_lastVendor);
+}
+
+function removeInvRow(i) {
+  invItems.splice(i, 1);
+  renderInvTable();
+  updateInvSummary(_lastVendor);
+}
+
+function addInvRow() {
+  invItems.push({name:'', qty:1, unit:'個', unitPrice:0, amount:0, category:'食材', _master:null, _masterPrice:null, _priceChanged:false});
+  renderInvTable();
+  updateInvSummary(_lastVendor);
+  setTimeout(()=>{
+    const rows = document.querySelectorAll('#invTableBody tr');
+    const last = rows[rows.length-1];
+    if(last) last.querySelector('input')?.focus();
+  }, 50);
+}
+
+let _lastVendor = '';
+function updateInvSummary(vendor) {
+  _lastVendor = vendor || _lastVendor;
+  const food  = invItems.filter(i=>i.category==='食材').reduce((s,i)=>s+(i.amount||0),0);
+  const pack  = invItems.filter(i=>i.category==='包材').reduce((s,i)=>s+(i.amount||0),0);
+  const other = invItems.filter(i=>i.category==='その他').reduce((s,i)=>s+(i.amount||0),0);
+  const total = food + pack + other;
+  const changed = invItems.filter(i=>i._priceChanged).length;
+  const unmatch = invItems.filter(i=>!i._master).length;
+  const sumEl = document.getElementById('invSummary');
+  if(sumEl) sumEl.innerHTML =
+    `<strong>${_lastVendor}</strong> から ${invItems.length}品目` +
+    (changed>0 ? `　<span style="color:var(--red);font-size:11px;font-weight:700">⚠️ 単価変更 ${changed}件</span>` : '') +
+    (unmatch>0 ? `　<span style="color:var(--red);font-size:11px;font-weight:700">⚠️ 未照合 ${unmatch}件</span>` : '') +
+    `<br>食材 <strong style="color:var(--accent2)">${yen(food)}</strong> / 包材 <strong style="color:var(--blue)">${yen(pack)}</strong>` +
+    (other>0 ? ` / その他 <strong>${yen(other)}</strong>` : '') +
+    `　合計 <strong>${yen(total)}</strong>`;
+  const totalEl = document.getElementById('invTotal');
+  if(totalEl) totalEl.textContent = yen(total);
+}
+
+function showInvoiceResult(result) {
+  invItems = result.items;
+  invItems.forEach(item => {
+    const master = findMasterByName(item.name);
+    item._master = master || null;
+    item._masterPrice = master ? master.price : null;
+    item._priceChanged = master && item.unitPrice > 0 && item.unitPrice !== master.price;
+  });
+  _lastVendor = result.vendor;
+  document.getElementById('invTitle').textContent = `${result.vendor} — 読み取り完了`;
+  document.getElementById('invDate').textContent = result.date;
+  document.getElementById('invVendor').textContent = result.vendor;
+  renderInvTable();
+  updateInvSummary(result.vendor);
+  document.getElementById('invoiceResult').classList.add('show');
+}
+
+let _pendingPriceChanges = [];
+let _pendingInvoiceCallback = null;
+
+function confirmInvoice() {
+  const changed = invItems.filter(i => i._priceChanged);
+  if(changed.length > 0) {
+    _pendingPriceChanges = changed.map(item => ({item, newPrice: item.unitPrice}));
+    const list = _pendingPriceChanges.map(pc =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px">${pc.item.name}</span>
+        <span>
+          <span class="pc-old">¥${pc.item._masterPrice.toLocaleString()}</span>
+          <span style="margin:0 6px;color:var(--text3)">→</span>
+          <span class="pc-new">¥${pc.item.unitPrice.toLocaleString()}</span>
+        </span>
+      </div>`
+    ).join('');
+    document.getElementById('priceChangeList').innerHTML = list;
+    document.getElementById('priceModalOverlay').classList.add('open');
+    _pendingInvoiceCallback = () => doImportInvoice(true);
+    return;
+  }
+  doImportInvoice(false);
+}
+
+function applyPriceChanges() {
+  _pendingPriceChanges.forEach(pc => {
+    const master = pc.item._master;
+    if(master) { master.prevPrice = master.price; master.price = pc.item.unitPrice; }
+  });
+  saveLS('ls_sheets', SHEETS);
+  closePriceModal();
+  if(_pendingInvoiceCallback) { _pendingInvoiceCallback(); _pendingInvoiceCallback = null; }
+}
+
+function skipPriceChanges() {
+  closePriceModal();
+  if(_pendingInvoiceCallback) { _pendingInvoiceCallback(); _pendingInvoiceCallback = null; }
+}
+
+function closePriceModal() { document.getElementById('priceModalOverlay').classList.remove('open'); }
+
+function doImportInvoice(priceUpdated) {
+  const month = document.getElementById('monthSel').value;
+  const records = loadLS('ls_shiire', []);
+  const vendor = _lastVendor || '不明';
+  const date = document.getElementById('invDate').textContent || today();
+  invItems.forEach(item => {
+    if(!item.amount || item.amount === 0) return;
+    records.push({
+      id: 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      date, vendor, cat: item.category,
+      amount: item.amount, memo: item.name,
+      qty: item.qty, unit: item.unit, unitPrice: item.unitPrice
+    });
+  });
+  saveLS('ls_shiire', records);
+  const total = invItems.reduce((s,i)=>s+(i.amount||0),0);
+  document.getElementById('invSuccess').classList.add('show');
+  document.getElementById('invSuccessSub').textContent = `${vendor} / ${yen(total)} / ${invItems.length}品目`;
+  document.getElementById('invSuccessItems').innerHTML = invItems.map(i=>`<div>${i.name} × ${i.qty} = ${yen(i.amount)}</div>`).join('');
+  document.getElementById('invoiceResult').classList.remove('show');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// AIREGI CSV
+// ════════════════════════════════════════════════════════════════════════
+
+function handleAiregiFile(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => parseAiregiCSV(e.target.result);
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseAiregiCSV(text) {
+  const lines = text.split('\n').filter(l=>l.trim());
+  const header = lines[0].split(',').map(h=>h.replace(/"/g,'').trim());
+  const rows = lines.slice(1).map(l => {
+    const cols = l.split(',').map(c=>c.replace(/"/g,'').trim());
+    const obj = {};
+    header.forEach((h,i) => obj[h] = cols[i]||'');
+    return obj;
+  }).filter(r => r['売上日時']||r['日付']||r['販売日']);
+  if(rows.length === 0) { showToast('CSVのフォーマットが認識できません'); return; }
+  const salesData = rows.map(r => ({
+    date: r['売上日時']||r['日付']||r['販売日']||'',
+    item: r['商品名']||r['メニュー名']||'',
+    qty:  parseInt(r['数量']||r['個数']||'1')||1,
+    price: parseInt((r['売上金額']||r['金額']||r['単価']||'0').replace(/,/g,''))||0,
+    category: r['カテゴリ']||r['分類']||'',
+    payType: r['支払い方法']||r['決済方法']||''
+  }));
+  saveLS('ls_airegi', salesData);
+  showToast(`✓ ${salesData.length}件の売上データを取り込みました`);
+  renderSales();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// GAS 同期
+// ════════════════════════════════════════════════════════════════════════
+
+function getGasUrl() { return localStorage.getItem('ls_gas_url') || ''; }
+
+async function testGasConnection() {
+  const url = getGasUrl();
+  if(!url) { showToast('⚠️ 先にGAS URLを保存してください'); return; }
+  const btn = document.getElementById('gasTestBtn');
+  if(btn) { btn.textContent = '確認中...'; btn.disabled = true; }
+  try {
+    // GETリクエストで疎通確認（CORSの問題が一切ない）
+    const res = await fetch(url, { method: 'GET' });
+    const data = await res.json();
+    if(data.ok) {
+      showToast('✓ GAS接続成功！', 4000);
+      if(btn) { btn.textContent = '✓ 接続OK'; btn.style.color = 'var(--accent)'; }
+    } else {
+      showToast('⚠️ GASエラー: ' + (data.error||'不明'), 5000);
+      if(btn) btn.textContent = '接続テスト';
+    }
+  } catch(e) {
+    showToast('⚠️ 接続失敗: ' + e.message, 5000);
+    if(btn) btn.textContent = '接続テスト';
+  } finally {
+    if(btn) btn.disabled = false;
+  }
+}
+function getDeviceRole() { return localStorage.getItem('ls_device_role') || 'owner'; }
+
+async function syncNow(direction) {
+  if(direction === 'pull') { await pullFromGas(); return; }
+  // push（デフォルト）
+  const url = getGasUrl();
+  if(!url) { showToast('GAS URLが設定されていません'); return; }
+  const btn = document.getElementById('syncPushBtn');
+  const origText = btn ? btn.textContent : '';
+  if(btn) btn.textContent = '保存中...';
+  try {
+    const month = document.getElementById('monthSel')?.value || '';
+    const keys = ['stocks','sheets','shiire','fixedCosts','airegi'];
+    const values = {
+      stocks: stocks,
+      sheets: SHEETS,
+      shiire: loadLS('ls_shiire', []),
+      fixedCosts: loadLS('ls_fixed_costs', []),
+      airegi: loadLS('ls_airegi', []),
+    };
+    for(const key of keys) {
+      const res = await fetch(url, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ action:'save', key, value:values[key], month })
+      });
+      const data = await res.json();
+      if(!data.ok) throw new Error(key + ': ' + (data.error||'不明'));
+    }
+    localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
+    updateSyncStatus();
+    showToast('✓ スプレッドシートに保存しました');
+  } catch(e) { showToast('同期エラー: ' + e.message); }
+  finally { if(btn) btn.textContent = origText; }
+}
+
+async function pullFromGas() {
+  const url = getGasUrl();
+  if(!url) { showToast('GAS URLが設定されていません'); return; }
+  const btn = document.getElementById('syncPullBtn');
+  const origText = btn ? btn.textContent : '';
+  if(btn) btn.textContent = '取得中...';
+  try {
+    const month = document.getElementById('monthSel')?.value || '';
+    const res = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ action:'loadAll', keys:['stocks','sheets','shiire','fixedCosts','airegi'], month })
+    });
+    const data = await res.json();
+    if(data.stocks) { stocks = data.stocks; saveLS('ls_stocks', stocks); }
+    if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
+    if(data.shiire) { saveLS('ls_shiire', data.shiire); }
+    if(data.fixedCosts) { saveLS('ls_fixed_costs', data.fixedCosts); }
+    if(data.airegi) { saveLS('ls_airegi', data.airegi); }
+    localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
+    updateSyncStatus();
+    renderTana(); renderMaster();
+    showToast('✓ 最新データを取得しました');
+  } catch(e) { showToast('取得エラー: ' + e.message); }
+  finally { if(btn) btn.textContent = origText; }
+}
+
+async function saveMonthSnapshot() {
+  const url = getGasUrl();
+  if(!url) return;
+  const month = document.getElementById('monthSel').value;
+  const airegi = loadLS('ls_airegi', []);
+  const shiire = loadLS('ls_shiire', []);
+  const fixedCosts = loadLS('ls_fixedCosts', DEFAULT_FIXED_COSTS);
+  const totalSales = airegi.reduce((s,r)=>s+r.price,0);
+  const rawCost = shiire.reduce((s,r)=>s+r.amount,0);
+  const fixedTotal = fixedCosts.reduce((s,f)=>s+f.amount,0);
+  const grossProfit = totalSales - rawCost;
+  const tanaTotal = calcGrandTotal();
+  try {
+    await fetch(url, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ action:'saveMonthSnapshot', month,
+        value:{ totalSales, rawCost, grossProfit, fixedTotal, tanaTotal,
+                shohizei: Math.round(totalSales * 0.1),
+                shotokuTax: Math.round(grossProfit * 0.2),
+                jissitsu: grossProfit - fixedTotal }})
+    });
+  } catch(e) { console.warn('snapshot error:', e); }
+}
+
+function updateSyncStatus() {
+  const last = localStorage.getItem('ls_last_sync');
+  const el = document.getElementById('lastSyncTime');
+  if(el) el.textContent = last ? `最終同期: ${last}` : '未同期';
+}
+
+function saveGasUrl() {
+  const url = document.getElementById('gasUrlInput').value.trim();
+  localStorage.setItem('ls_gas_url', url);
+  showToast(url ? '✓ GAS URLを保存しました' : 'URLをクリアしました');
+  updateSyncStatus();
+}
+
+function saveDeviceRole() {
+  const role = document.getElementById('deviceRoleSelect').value;
+  localStorage.setItem('ls_device_role', role);
+  showToast(`✓ デバイスの役割を「${role === 'owner' ? 'オーナー' : 'スタッフ'}」に設定しました`);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// MASTER
+// ════════════════════════════════════════════════════════════════════════
+
+function renderMaster(q='') {
+  document.getElementById('masterTabs').innerHTML=SHEETS.map((sh,i)=>`<div class="master-tab ${i===masterSheetIdx?'active':''}" onclick="switchMasterTab(${i})">${sh.name}（${sh.items.length}）</div>`).join('');
+  const sh=SHEETS[masterSheetIdx];
+  const items=q?sh.items.filter(i=>i.name.includes(q)):sh.items;
+  document.getElementById('masterCount').textContent=SHEETS.reduce((s,sh)=>s+sh.items.length,0);
+  document.getElementById('masterTable').innerHTML=items.map(item=>{
+    const u=item.qty?item.price/item.qty:null;
+    const t=item.unitLabel||(item.tanaUnit&&item.qty?item.tanaUnit:item.unit);
+    const upStr=u!==null?'¥'+(u<1?u.toFixed(3):u<10?u.toFixed(2):u<100?u.toFixed(1):Math.round(u).toLocaleString())+'/'+t:'-';
+    return `<tr>
+      <td style="font-weight:500">${item.name}${u!==null?`<span class="m-card-unit-price-sp">${upStr}</span>`:''}</td>
+      <td class="r" style="font-family:'DM Mono',monospace">¥${item.price.toLocaleString()}</td>
+      <td class="r pc-only" style="font-family:'DM Mono',monospace;color:var(--accent2);font-weight:500">${upStr}</td>
+      <td class="pc-only" style="font-family:'DM Mono',monospace;color:var(--text3)">${item.unit}</td>
+      <td class="pc-only" style="font-family:'DM Mono',monospace;color:var(--text3)">${item.qty?item.qty.toLocaleString():'-'}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--accent2)">${item.tanaUnit||'-'}</td>
+      <td style="display:flex;gap:5px;padding:8px 10px;flex-wrap:wrap">
+        <button class="action-btn edit-btn" onclick="openEditModal('${item.id}')">編集</button>
+        <button class="action-btn del-btn" onclick="deleteItem('${item.id}')">削除</button>
+      </td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px">品目がありません</td></tr>';
+}
+function switchMasterTab(idx){masterSheetIdx=idx;renderMaster();}
+function filterMaster(q){renderMaster(q);}
+function openAddModal(){editItemId=null;document.getElementById('modalTitle').textContent='品目追加';['m-name','m-unit','m-price','m-qty','m-tana-unit','m-unit-label'].forEach(id=>document.getElementById(id).value='');document.getElementById('m-sheet').value=masterSheetIdx;document.getElementById('modalOverlay').classList.add('open');}
+function openEditModal(id){editItemId=id;const item=findItem(id);if(!item)return;const shIdx=SHEETS.findIndex(sh=>sh.items.some(i=>i.id===id));document.getElementById('modalTitle').textContent='品目編集';document.getElementById('m-name').value=item.name;document.getElementById('m-sheet').value=shIdx;document.getElementById('m-unit').value=item.unit;document.getElementById('m-price').value=item.price;document.getElementById('m-qty').value=item.qty||'';document.getElementById('m-tana-unit').value=item.tanaUnit||'';document.getElementById('m-unit-label').value=item.unitLabel||'';document.getElementById('modalOverlay').classList.add('open');}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');}
+function saveItem(){
+  const name=document.getElementById('m-name').value.trim();
+  const shIdx=parseInt(document.getElementById('m-sheet').value);
+  const unit=document.getElementById('m-unit').value.trim()||'個';
+  const price=parseFloat(document.getElementById('m-price').value)||0;
+  const qty=parseFloat(document.getElementById('m-qty').value)||null;
+  const tanaUnit=document.getElementById('m-tana-unit').value.trim()||null;
+  const unitLabel=document.getElementById('m-unit-label').value.trim()||null;
+  if(!name){showToast('品目名を入力してください');return;}
+  if(editItemId){
+    const item=findItem(editItemId);if(!item)return;
+    const oldShIdx=SHEETS.findIndex(sh=>sh.items.some(i=>i.id===editItemId));
+    item.name=name;item.unit=unit;item.price=price;item.qty=qty;item.tanaUnit=tanaUnit;item.unitLabel=unitLabel;
+    if(oldShIdx!==shIdx){SHEETS[oldShIdx].items=SHEETS[oldShIdx].items.filter(i=>i.id!==editItemId);SHEETS[shIdx].items.push(item);}
+    showToast('✓ 品目を更新しました');
+  } else {
+    SHEETS[shIdx].items.push({id:'u'+Date.now(),name,price,prevPrice:price,unit,qty,tanaUnit,unitLabel});
+    showToast('✓ 品目を追加しました');
+  }
+  saveLS('ls_sheets',SHEETS);closeModal();renderMaster();
+}
+function deleteItem(id){if(!confirm('この品目を削除しますか？'))return;SHEETS.forEach(sh=>{sh.items=sh.items.filter(i=>i.id!==id);});delete stocks[id];saveLS('ls_sheets',SHEETS);saveLS('ls_stocks',stocks);renderMaster();showToast('削除しました');}
+
+// ── APIキー ──────────────────────────────────────────────────
+
+function getApiKey() { return localStorage.getItem('ls_api_key') || ''; }
+function openApiKeyModal() { document.getElementById('apiKeyModalOverlay').classList.add('open'); updateApiKeyStatus(); }
+function closeApiKeyModal() { document.getElementById('apiKeyModalOverlay').classList.remove('open'); }
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if(key) localStorage.setItem('ls_api_key', key);
+  else localStorage.removeItem('ls_api_key');
+  updateApiKeyStatus();
+  closeApiKeyModal();
+  showToast(key ? '✓ APIキーを保存しました' : 'APIキーをクリアしました');
+}
+function updateApiKeyStatus() {
+  const key = getApiKey();
+  const statusEl = document.getElementById('apiKeyStatus');
+  const inputEl  = document.getElementById('apiKeyInput');
+  if(statusEl) statusEl.innerHTML = key
+    ? `<span style="color:var(--accent)">✓ 設定済み</span>`
+    : `<span style="color:var(--text3)">未設定</span>`;
+  if(inputEl) {
+    inputEl.value = '';
+    inputEl.placeholder = key ? '（設定済み：変更する場合は上書き入力）' : 'sk-ant-api03-...';
+  }
+}
+
+// ── データリセット ────────────────────────────────────────────
+
+function resetMasterOnly() {
+  if(!confirm('品目マスタをExcelの初期データ（184品目）に更新します。\n棚卸の入力済みデータも消えます。よろしいですか？')) return;
+  SHEETS = JSON.parse(JSON.stringify(DEFAULT_SHEETS));
+  stocks = JSON.parse(JSON.stringify(DEFAULT_STOCKS));
+  saveLS('ls_sheets', SHEETS);
+  saveLS('ls_stocks', stocks);
+  showToast('✓ 品目マスタを初期データに更新しました（184品目）');
+  if(curPage === 'tana')   renderTana();
+  if(curPage === 'master') renderMaster();
+}
+
+function resetAllData() {
+  if(!confirm('品目マスタと棚卸データを完全に初期化します。\n※ 仕入台帳・固定費・売上データは残ります。\n\nよろしいですか？')) return;
+  SHEETS = JSON.parse(JSON.stringify(DEFAULT_SHEETS));
+  stocks = JSON.parse(JSON.stringify(DEFAULT_STOCKS));
+  saveLS('ls_sheets', SHEETS);
+  saveLS('ls_stocks', stocks);
+  showToast('✓ 品目マスタ・棚卸を初期化しました');
+  if(curPage === 'tana')   renderTana();
+  if(curPage === 'master') renderMaster();
+}
+
+// ── ローカルバックアップ ──────────────────────────────────────
+
+function exportLocalData() {
+  const data = {
+    stocks: loadLS('ls_stocks', {}),
+    sheets: loadLS('ls_sheets', []),
+    shiire: loadLS('ls_shiire', []),
+    fixedCosts: loadLS('ls_fixedCosts', []),
+    airegi: loadLS('ls_airegi', []),
+    exported: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `localstore_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function importLocalData(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if(data.stocks) { stocks = data.stocks; saveLS('ls_stocks', stocks); }
+      if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
+      if(data.shiire) saveLS('ls_shiire', data.shiire);
+      if(data.fixedCosts) saveLS('ls_fixedCosts', data.fixedCosts);
+      if(data.airegi) saveLS('ls_airegi', data.airegi);
+      renderTana(); renderMaster(); renderDash();
+      showToast('✓ バックアップから復元しました');
+    } catch(err) { showToast('JSONの読み込みに失敗しました'); }
+  };
+  reader.readAsText(file);
+}
+
+
+// ════════════════════════════════════════════════════════════════════════
+// Init
+// ════════════════════════════════════════════════════════════════════════
+
+// 月セレクタ初期化
+(function initMonthSel(){
+  const sel=document.getElementById('monthSel');
+  if(!sel)return;
+  const now=new Date();
+  sel.innerHTML='';
+  for(let i=0;i<12;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const val=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`;
+    const opt=document.createElement('option');
+    opt.value=val;opt.textContent=`${d.getFullYear()}年${d.getMonth()+1}月`;
+    if(i===0)opt.selected=true;
+    sel.appendChild(opt);
+  }
+})();
+
+updateSyncStatus();
+updateApiKeyStatus();
+updateTanaMonthLabel();
+nav('dash');
+
+</script>
+</body>
+</html>
