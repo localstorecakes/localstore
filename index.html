@@ -2302,7 +2302,7 @@ async function analyzeInvoice() {
   try {
     const res = await fetch(gasUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ action:'invoiceOcr', apiKey, imageBase64:invImgB64, mediaType:invImgType })
     });
     const data = await res.json();
