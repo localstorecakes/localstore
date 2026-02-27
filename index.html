@@ -1050,11 +1050,7 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
 // DATA
 // ════════════════════════════════════════════════════════════════════════
 
-const MONTHLY_HIST = [
-  {m:'8月', s:520000,c:248000,p:272000},{m:'9月', s:610000,c:298000,p:312000},
-  {m:'10月',s:580000,c:271000,p:309000},{m:'11月',s:720000,c:346000,p:374000},
-  {m:'12月',s:890000,c:421000,p:469000},{m:'1月', s:688420,c:312840,p:375580},
-];
+// MONTHLY_HIST は renderDash() 内で月次履歴から動的生成します
 
 const AIREGI_REAL = [
   {"day":7,"dow":2,"sales":17415,"customers":10,"items":41,"cash":5170,"cashless":12245,"discount":-695},
@@ -1562,17 +1558,48 @@ function renderDash() {
     {l:'粗利（概算）',v:yen(rawProfit),          sub:'売上−仕入',cls:'k-purple'},
   ].map(k=>`<div class="kpi ${k.cls}"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
-  // Trend bars
-  const maxS = Math.max(...MONTHLY_HIST.map(d=>d.s));
-  document.getElementById('trendBars').innerHTML = MONTHLY_HIST.map(d=>`
-    <div class="t-grp">
-      <div class="t-inner">
-        <div class="t-bar bs" style="height:${d.s/maxS*62}px" title="${yen(d.s)}"></div>
-        <div class="t-bar bc" style="height:${d.c/maxS*62}px" title="${yen(d.c)}"></div>
-        <div class="t-bar bp" style="height:${d.p/maxS*62}px" title="${yen(d.p)}"></div>
-      </div>
-      <div class="t-lbl">${d.m}</div>
-    </div>`).join('');
+  // Trend bars: 月次履歴から動的生成
+  const monthlyHist = loadLS('ls_monthly_history', []);
+  // 現在選択中の月も含めて最新6ヶ月分を構築
+  const selM = document.getElementById('monthSel')?.value || '';
+  const histMap = {};
+  monthlyHist.forEach(h => { histMap[h.month] = h; });
+  // 今月のデータを追加（リアルタイム）
+  if(selM) {
+    const curSales = ar ? ar.reduce((s,d)=>s+d.sales,0) : 0;
+    const curCost  = shiireData.reduce((s,r)=>s+r.amount,0);
+    histMap[selM] = { month:selM, totalSales:curSales, rawCost:curCost, grossProfit:curSales-curCost };
+  }
+  // 直近6ヶ月のキーを生成
+  const now2 = new Date();
+  const recentMonths = [];
+  for(let i=5;i>=0;i--) {
+    const d = new Date(now2.getFullYear(), now2.getMonth()-i, 1);
+    recentMonths.push(`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  const dynHist = recentMonths
+    .filter(m => histMap[m])
+    .map(m => ({
+      m: parseInt(m.split('/')[1])+'月',
+      s: histMap[m].totalSales || 0,
+      c: histMap[m].rawCost    || 0,
+      p: histMap[m].grossProfit|| 0,
+    }));
+  const trendEl = document.getElementById('trendBars');
+  if(dynHist.length === 0) {
+    trendEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:20px;text-align:center">月次データがまだありません<br><small>月末に「今月分を記録する」を押すと表示されます</small></div>';
+  } else {
+    const maxS = Math.max(...dynHist.map(d=>d.s), 1);
+    trendEl.innerHTML = dynHist.map(d=>`
+      <div class="t-grp">
+        <div class="t-inner">
+          <div class="t-bar bs" style="height:${d.s/maxS*62}px" title="${yen(d.s)}"></div>
+          <div class="t-bar bc" style="height:${d.c/maxS*62}px" title="${yen(d.c)}"></div>
+          <div class="t-bar bp" style="height:${Math.max(0,d.p)/maxS*62}px" title="${yen(d.p)}"></div>
+        </div>
+        <div class="t-lbl">${d.m}</div>
+      </div>`).join('');
+  }
 
   // Tana snapshot
   const totals = SHEETS.map((sh,i)=>({name:sh.name,total:calcSheetTotal(i)}));
@@ -2656,6 +2683,13 @@ async function saveMonthSnapshot() {
                 jissitsu: grossProfit - fixedTotal }})
     });
   } catch(e) { console.warn('snapshot error:', e); }
+  // ローカルの月次履歴にも保存
+  const hist = loadLS('ls_monthly_history', []);
+  const idx = hist.findIndex(h => h.month === month);
+  const entry = { month, totalSales, rawCost, grossProfit, fixedTotal, tanaTotal };
+  if(idx >= 0) hist[idx] = entry; else hist.push(entry);
+  saveLS('ls_monthly_history', hist);
+  showToast('✓ ' + month + ' の月次データを記録しました');
 }
 
 function updateSyncStatus() {
