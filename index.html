@@ -1547,13 +1547,13 @@ function renderDash() {
   const shiireTotal = shiireData.reduce((s,r)=>s+r.amount,0);
 
   // KPI – use real airegi if loaded
-  const totalSales = ar ? ar.reduce((s,d)=>s+d.sales,0) : 688420;
+  const totalSales = ar ? ar.reduce((s,d)=>s+d.sales,0) : 0;
   const totalCust  = ar ? ar.reduce((s,d)=>s+d.customers,0) : 352;
-  const rawProfit  = totalSales - 312840;
+  const rawProfit  = totalSales - shiireTotal;
   document.getElementById('dashKpi').innerHTML = [
     {l:'税込売上',   v:yen(totalSales),         sub: ar?'Airレジ実データ':'推定値',cls:'k-green'},
     {l:'総客数',     v:totalCust+'人',           sub:'客単価 '+yen(Math.round(totalSales/totalCust)),cls:'k-blue'},
-    {l:'仕入合計',   v:yen(shiireTotal||312840), sub:'食材+包材',cls:'k-red'},
+    {l:'仕入合計',   v:yen(shiireTotal), sub:'食材+包材',cls:'k-red'},
     {l:'棚卸合計',   v:yen(tanaTotal),           sub:'入力データより',cls:'k-yellow'},
     {l:'粗利（概算）',v:yen(rawProfit),          sub:'売上−仕入',cls:'k-purple'},
   ].map(k=>`<div class="kpi ${k.cls}"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
@@ -2056,13 +2056,25 @@ const DEFAULT_FIXED_COSTS = [
 
 let fixedCosts = loadLS('ls_fixed_costs', JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
 
+// 期首在庫合計（prevStock × 単価）
+function calcPrevTotal() {
+  let total = 0;
+  SHEETS.forEach(sh => sh.items.forEach(item => {
+    const s = stocks[item.id];
+    if(s && s.prevStock !== undefined && s.prevStock > 0) {
+      total += calcItemAmount(item, s.prevStock);
+    }
+  }));
+  return total;
+}
+
 function renderMonthly() {
   document.getElementById('monthlyBadge').textContent = document.getElementById('monthSel').value;
   const tanaTotal   = calcGrandTotal();
   const shiireTotal = shiireData.reduce((s,r) => s+r.amount, 0);
   const ar          = airegiData;
-  const totalSales  = ar ? ar.reduce((s,d) => s+d.sales, 0) : 688420;
-  const rawCost     = shiireTotal || 312840;
+  const totalSales  = ar ? ar.reduce((s,d) => s+d.sales, 0) : 0;
+  const rawCost     = shiireTotal;
   const grossProfit = totalSales - rawCost;
   const fixedTotal  = fixedCosts.reduce((s,r) => s+r.amount, 0);
   const teNokori    = grossProfit - fixedTotal;
@@ -2085,7 +2097,7 @@ function renderMonthly() {
     {l:'（消費税）',  v:yen(Math.round(totalSales/11)),    bold:false, sub:true},
     {l:'税抜売上',    v:yen(Math.round(totalSales/1.1)),   bold:false},
     null,
-    {l:'期首在庫',    v:'¥271,870',                        bold:false},
+    {l:'期首在庫',    v:yen(calcPrevTotal()),               bold:false},
     {l:'当月仕入合計',v:yen(rawCost),                      bold:false},
     {l:'期末在庫',    v:yen(tanaTotal),                    bold:false},
     {l:'原価合計',    v:yen(rawCost),                      bold:true},
@@ -2138,9 +2150,9 @@ function renderFixedCostRows() {
 
   // Recalculate 手残り・税
   const ar2 = airegiData;
-  const totalSales2 = ar2 ? ar2.reduce((s,d)=>s+d.sales,0) : 688420;
+  const totalSales2 = ar2 ? ar2.reduce((s,d)=>s+d.sales,0) : 0;
   const shiireTotal2 = shiireData.reduce((s,r)=>s+r.amount,0);
-  const grossProfit2 = totalSales2 - (shiireTotal2 || 312840);
+  const grossProfit2 = totalSales2 - shiireTotal2;
   const teNokori2   = grossProfit2 - fixedTotal;
   const shohizei2   = Math.round(totalSales2 / 11);
   const taxRate2    = parseFloat(document.getElementById('taxRateSel')?.value || '0.20');
@@ -2872,7 +2884,7 @@ function importLocalData(input) {
   const now=new Date();
   sel.innerHTML='';
   // アプリ開始月（2026年2月）より前は表示しない
-  const startYear=2026, startMonth=2;
+  const startYear=2026, startMonth=1;
   for(let i=0;i<6;i++){
     const d=new Date(now.getFullYear(),now.getMonth()-i,1);
     if(d.getFullYear()<startYear||(d.getFullYear()===startYear&&d.getMonth()+1<startMonth)) break;
