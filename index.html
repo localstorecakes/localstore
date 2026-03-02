@@ -1986,8 +1986,10 @@ function startNextMonth() {
     // price は DEFAULT_SHEETS から取るのでここでは保持しない
   });
 
-  saveLS(stocksKey(), stocks);
-  saveLS('ls_airegi', null);  // 売上データもリセット（月が変わるため）
+  // 今月のキーで保存（月セレクタ変更前）
+  const curMonthKey = stocksKey();
+  saveLS(curMonthKey, stocks);
+  saveLS('ls_airegi', null);
 
   // 月セレクタを翌月に進める
   const sel = document.getElementById('monthSel');
@@ -1996,6 +1998,16 @@ function startNextMonth() {
     const nextM = m === 12 ? 1 : m + 1;
     const nextY = m === 12 ? y + 1 : y;
     const nextVal = `${nextY}/${String(nextM).padStart(2,'0')}`;
+    // 翌月のstocksをprevStockだけにして初期化
+    const nextKey = 'ls_stocks_' + nextVal.replace('/', '-');
+    const nextStocks = {};
+    Object.keys(stocks).forEach(id => {
+      if(stocks[id] && stocks[id].prevStock !== undefined) {
+        nextStocks[id] = { prevStock: stocks[id].prevStock };
+      }
+    });
+    localStorage.setItem(nextKey, JSON.stringify(nextStocks));
+
     // 選択肢に翌月がなければ追加
     let opt = Array.from(sel.options).find(o => o.value === nextVal);
     if(!opt) {
@@ -2005,7 +2017,8 @@ function startNextMonth() {
       sel.insertBefore(opt, sel.options[0]);
     }
     sel.value = nextVal;
-    onMonthChange(nextVal);
+    stocks = nextStocks;
+    changeMonth(nextVal);
   }
 
   renderTana();
