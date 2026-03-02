@@ -2983,6 +2983,65 @@ updateTanaMonthLabel();
 })();
 nav('dash');
 
+// ── 起動時自動同期 ──────────────────────────────────────
+(async function autoSyncOnStart() {
+  const url = getGasUrl();
+  if(!url) return; // GAS未設定なら何もしない
+
+  const month = document.getElementById('monthSel')?.value || '';
+  const lastSync = localStorage.getItem('ls_last_sync');
+  const lastEdit = localStorage.getItem('ls_last_edit');
+
+  try {
+    showToast('🔄 最新データを確認中...', 2000);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'loadAll', keys: ['stocks','sheets','shiire','fixedCosts','airegi'], month })
+    });
+    const data = await res.json();
+
+    // ローカルに未同期の編集がある場合は確認
+    if(lastEdit && lastSync && new Date(lastEdit) > new Date(lastSync)) {
+      const ok = confirm('ローカルに未同期の編集があります。\nGASの最新データで上書きしますか？\n\n「キャンセル」を押すと今の入力が保持されます。');
+      if(!ok) {
+        showToast('⚠️ 同期をスキップしました（ローカルデータを保持）', 3000);
+        return;
+      }
+    }
+
+    // データを反映
+    let updated = false;
+    if(data.stocks) { stocks = data.stocks; saveLS(stocksKey(), stocks); updated = true; }
+    if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); updated = true; }
+    if(data.shiire) { saveLS('ls_shiire', data.shiire); updated = true; }
+    if(data.fixedCosts) { saveLS('ls_fixed_costs', data.fixedCosts); updated = true; }
+    if(data.airegi) { saveLS('ls_airegi', data.airegi); updated = true; }
+
+    if(updated) {
+      localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
+      updateSyncStatus();
+      renderTana(); renderMaster();
+      renderDash?.();
+      showToast('✅ 起動時同期完了', 3000);
+    } else {
+      showToast('✅ データは最新です', 2000);
+    }
+  } catch(e) {
+    showToast('⚠️ 起動時同期失敗（オフライン？）', 3000);
+  }
+})();
+
+// 保存操作のたびに最終編集時刻を記録
+const _origSaveLS = saveLS;
+function saveLS(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+  // stocks や shiire の保存時は編集時刻を更新
+  if(key.startsWith('ls_stocks_') || key === 'ls_shiire' || key === 'ls_sheets') {
+    localStorage.setItem('ls_last_edit', new Date().toISOString());
+  }
+}
+
 </script>
 </body>
 </html>
