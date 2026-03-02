@@ -1468,7 +1468,11 @@ const DEFAULT_STOCKS = {
 // ════════════════════════════════════════════════════════════════════════
 
 let SHEETS = loadLS('ls_sheets', JSON.parse(JSON.stringify(DEFAULT_SHEETS)));
-let stocks = loadLS('ls_stocks', JSON.parse(JSON.stringify(DEFAULT_STOCKS)));
+function stocksKey(m) {
+  const month = m || document.getElementById('monthSel')?.value || '2026/02';
+  return 'ls_stocks_' + month.replace('/', '-');
+}
+let stocks = loadLS(stocksKey(), JSON.parse(JSON.stringify(DEFAULT_STOCKS)));
 let shiireData = loadLS('ls_shiire', []);
 let airegiData = loadLS('ls_airegi', null);
 let curPage = 'dash';
@@ -1526,17 +1530,20 @@ function closeSidebar() {
   document.getElementById('overlayBg').classList.remove('show');
 }
 function changeMonth(v) {
+  // 月切替時にその月のstocksを読み込む
+  stocks = loadLS(stocksKey(v), JSON.parse(JSON.stringify(DEFAULT_STOCKS)));
   // 右上バッジを更新
   const badge = document.getElementById('tbBadge');
   if(badge && v) {
     const parts = v.split('/');
     badge.textContent = parts[0]+'年'+parseInt(parts[1])+'月';
   }
-  showToast('📅 '+v.replace('/',' 年').replace(/(\d+)$/,(m)=>parseInt(m)+'月')+' のデータを表示');
+  showToast('📅 '+v.split('/')[0]+'年'+parseInt(v.split('/')[1])+'月 のデータを表示');
   // 各ページを再描画
   if(curPage==='dash')    renderDash?.();
   if(curPage==='sales')   renderSales();
   if(curPage==='shiire')  renderShiire();
+  if(curPage==='tana')    renderTana();
   if(curPage==='monthly') renderMonthly?.();
 }
 
@@ -1910,10 +1917,10 @@ function toggleCard(id) {
   if(openCard===id){openCard=null;document.getElementById('card-'+id)?.classList.remove('open');}
   else{if(openCard)document.getElementById('card-'+openCard)?.classList.remove('open');openCard=id;document.getElementById('card-'+id)?.classList.add('open');setTimeout(()=>{const el=document.getElementById('si-'+id);if(el){el.focus();el.select();}},60);}
 }
-function setStock(id,val){const item=findItem(id);if(!item)return;if(!stocks[id])stocks[id]={stock:val,price:item.price};else stocks[id].stock=val;document.getElementById('si-'+id).value=val;updateSub(id);refreshCard(id);saveLS('ls_stocks',stocks);}
-function adjStock(id,delta){const item=findItem(id);if(!item)return;const cur=stocks[id]?.stock??0;const nv=Math.max(0,Math.round((cur+delta)*10)/10);if(!stocks[id])stocks[id]={stock:nv,price:item.price};else stocks[id].stock=nv;document.getElementById('si-'+id).value=nv;updateSub(id);refreshCard(id);saveLS('ls_stocks',stocks);}
-function onStockIn(id,val){const num=parseFloat(val);if(isNaN(num))return;const item=findItem(id);if(!stocks[id])stocks[id]={stock:num,price:item.price};else stocks[id].stock=num;updateSub(id);refreshCard(id);saveLS('ls_stocks',stocks);}
-function onPriceIn(id,val){const num=parseFloat(val);if(isNaN(num))return;const item=findItem(id);if(!stocks[id])stocks[id]={stock:0,price:num};else stocks[id].price=num;if(item)item.price=num;saveLS('ls_sheets',SHEETS);updateSub(id);saveLS('ls_stocks',stocks);}
+function setStock(id,val){const item=findItem(id);if(!item)return;if(!stocks[id])stocks[id]={stock:val,price:item.price};else stocks[id].stock=val;document.getElementById('si-'+id).value=val;updateSub(id);refreshCard(id);saveLS(stocksKey(),stocks);}
+function adjStock(id,delta){const item=findItem(id);if(!item)return;const cur=stocks[id]?.stock??0;const nv=Math.max(0,Math.round((cur+delta)*10)/10);if(!stocks[id])stocks[id]={stock:nv,price:item.price};else stocks[id].stock=nv;document.getElementById('si-'+id).value=nv;updateSub(id);refreshCard(id);saveLS(stocksKey(),stocks);}
+function onStockIn(id,val){const num=parseFloat(val);if(isNaN(num))return;const item=findItem(id);if(!stocks[id])stocks[id]={stock:num,price:item.price};else stocks[id].stock=num;updateSub(id);refreshCard(id);saveLS(stocksKey(),stocks);}
+function onPriceIn(id,val){const num=parseFloat(val);if(isNaN(num))return;const item=findItem(id);if(!stocks[id])stocks[id]={stock:0,price:num};else stocks[id].price=num;if(item)item.price=num;saveLS('ls_sheets',SHEETS);updateSub(id);saveLS(stocksKey(),stocks);}
 function onUnitChange(id,val){const item=findItem(id);if(item){item.unit=val;saveLS('ls_sheets',SHEETS);}showToast('✓ 単位を更新しました');}
 function updateSub(id){const s=stocks[id];if(!s)return;const item=findItem(id);const el=document.getElementById('sub-'+id);if(el&&item)el.textContent=yen(calcItemAmount(item,s.stock));}
 function refreshCard(id){const card=document.getElementById('card-'+id);if(!card)return;const s=stocks[id];const item=findItem(id);if(s&&s.stock!==undefined&&item){card.classList.add('has-val');const disp=card.querySelector('.istock');if(disp)disp.textContent=s.stock;const chk=card.querySelector('.ichk');if(chk)chk.textContent='✓';const a=calcItemAmount(item,s.stock);const amt=card.querySelector('.iamt');if(amt)amt.textContent=yen(a);else{const r=card.querySelector('.iright');if(r)r.insertAdjacentHTML('beforeend',`<div class="iamt">${yen(a)}</div>`);}}updateProgress();updateTanaTabCounts();}
@@ -1979,7 +1986,7 @@ function startNextMonth() {
     // price は DEFAULT_SHEETS から取るのでここでは保持しない
   });
 
-  saveLS('ls_stocks', stocks);
+  saveLS(stocksKey(), stocks);
   saveLS('ls_airegi', null);  // 売上データもリセット（月が変わるため）
 
   // 月セレクタを翌月に進める
@@ -2018,7 +2025,7 @@ function confirmMonthEnd() {
       stocks[id].prevStock = stocks[id].stock;
     }
   });
-  saveLS('ls_stocks', stocks);
+  saveLS(stocksKey(), stocks);
 
   // 月次スナップショットも自動保存（GAS連携があれば）
   const gasUrl = getGasUrl();
@@ -2039,7 +2046,7 @@ function updateTanaMonthLabel() {
   el.textContent = hasAny ? '（期首あり）' : '';
 }
 
-function saveAll(){saveLS('ls_stocks',stocks);saveLS('ls_sheets',SHEETS);updateProgress();updateTanaTabCounts();renderTanaTabs();showToast(`✓ 保存しました  合計 ${yen(calcGrandTotal())}`);}
+function saveAll(){saveLS(stocksKey(),stocks);saveLS('ls_sheets',SHEETS);updateProgress();updateTanaTabCounts();renderTanaTabs();showToast(`✓ 保存しました  合計 ${yen(calcGrandTotal())}`);}
 
 // ════════════════════════════════════════════════════════════════════════
 // 月次集計 & 固定費管理
@@ -2644,7 +2651,7 @@ async function syncNow(direction) {
     const month = document.getElementById('monthSel')?.value || '';
     const keys = ['stocks','sheets','shiire','fixedCosts','airegi'];
     const values = {
-      stocks: stocks,
+      stocks: loadLS(stocksKey(), stocks),
       sheets: SHEETS,
       shiire: loadLS('ls_shiire', []),
       fixedCosts: loadLS('ls_fixed_costs', []),
@@ -2678,7 +2685,7 @@ async function pullFromGas() {
       body: JSON.stringify({ action:'loadAll', keys:['stocks','sheets','shiire','fixedCosts','airegi'], month })
     });
     const data = await res.json();
-    if(data.stocks) { stocks = data.stocks; saveLS('ls_stocks', stocks); }
+    if(data.stocks) { stocks = data.stocks; saveLS(stocksKey(), stocks); }
     if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
     if(data.shiire) { saveLS('ls_shiire', data.shiire); }
     if(data.fixedCosts) { saveLS('ls_fixed_costs', data.fixedCosts); }
@@ -2842,7 +2849,7 @@ function saveItem(){
   }
   saveLS('ls_sheets',SHEETS);closeModal();renderMaster();
 }
-function deleteItem(id){if(!confirm('この品目を削除しますか？'))return;SHEETS.forEach(sh=>{sh.items=sh.items.filter(i=>i.id!==id);});delete stocks[id];saveLS('ls_sheets',SHEETS);saveLS('ls_stocks',stocks);renderMaster();showToast('削除しました');}
+function deleteItem(id){if(!confirm('この品目を削除しますか？'))return;SHEETS.forEach(sh=>{sh.items=sh.items.filter(i=>i.id!==id);});delete stocks[id];saveLS('ls_sheets',SHEETS);saveLS(stocksKey(),stocks);renderMaster();showToast('削除しました');}
 
 // ── APIキー ──────────────────────────────────────────────────
 
@@ -2885,7 +2892,7 @@ function resetMasterOnly() {
   SHEETS = JSON.parse(JSON.stringify(DEFAULT_SHEETS));
   stocks = JSON.parse(JSON.stringify(DEFAULT_STOCKS));
   saveLS('ls_sheets', SHEETS);
-  saveLS('ls_stocks', stocks);
+  saveLS(stocksKey(), stocks);
   showToast('✓ 品目マスタを初期データに更新しました（184品目）');
   if(curPage === 'tana')   renderTana();
   if(curPage === 'master') renderMaster();
@@ -2896,7 +2903,7 @@ function resetAllData() {
   SHEETS = JSON.parse(JSON.stringify(DEFAULT_SHEETS));
   stocks = JSON.parse(JSON.stringify(DEFAULT_STOCKS));
   saveLS('ls_sheets', SHEETS);
-  saveLS('ls_stocks', stocks);
+  saveLS(stocksKey(), stocks);
   showToast('✓ 品目マスタ・棚卸を初期化しました');
   if(curPage === 'tana')   renderTana();
   if(curPage === 'master') renderMaster();
@@ -2906,7 +2913,7 @@ function resetAllData() {
 
 function exportLocalData() {
   const data = {
-    stocks: loadLS('ls_stocks', {}),
+    stocks: loadLS(stocksKey(), {}),
     sheets: loadLS('ls_sheets', []),
     shiire: loadLS('ls_shiire', []),
     fixedCosts: loadLS('ls_fixedCosts', []),
@@ -2926,7 +2933,7 @@ function importLocalData(input) {
   reader.onload = e => {
     try {
       const data = JSON.parse(e.target.result);
-      if(data.stocks) { stocks = data.stocks; saveLS('ls_stocks', stocks); }
+      if(data.stocks) { stocks = data.stocks; saveLS(stocksKey(), stocks); }
       if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
       if(data.shiire) saveLS('ls_shiire', data.shiire);
       if(data.fixedCosts) saveLS('ls_fixedCosts', data.fixedCosts);
