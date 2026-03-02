@@ -996,18 +996,21 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
 <!-- PRICE CHANGE MODAL -->
 <div class="price-modal-overlay" id="priceModalOverlay">
   <div class="price-modal">
-    <div class="price-modal-hdr">
-      <span class="price-modal-icon">⚠️</span>
-      <div>
-        <div class="price-modal-title">単価の変更が検出されました</div>
-        <div class="price-modal-sub">マスタに反映する品目にチェックを入れてください</div>
+    <div class="price-modal-hdr" style="display:flex;align-items:flex-start;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="price-modal-icon">⚠️</span>
+        <div>
+          <div class="price-modal-title">単価の変更が検出されました</div>
+          <div class="price-modal-sub">マスタに反映する品目にチェックを入れてください</div>
+        </div>
       </div>
+      <button onclick="skipPriceChanges()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);padding:0 0 0 10px;line-height:1">✕</button>
     </div>
     <div class="price-change-list" id="priceChangeList"></div>
     <div class="price-modal-footer">
       <div class="price-modal-footer-note">チェックした品目は<strong>品目マスタの単価</strong>と<strong>棚卸の⚠️バッジ</strong>が更新されます</div>
-      <button class="btn btn-sec" onclick="skipPriceUpdate()" style="white-space:nowrap">スキップ</button>
-      <button class="btn btn-primary" onclick="applyPriceUpdate()" style="white-space:nowrap">✓ 反映する</button>
+      <button class="btn btn-sec" onclick="skipPriceChanges()" style="white-space:nowrap">スキップ</button>
+      <button class="btn btn-primary" onclick="applyPriceChanges()" style="white-space:nowrap">✓ 反映する</button>
     </div>
   </div>
 </div>
@@ -2372,7 +2375,7 @@ function renderInvTable() {
       ? 'background:#fff5f5;outline:1.5px solid var(--red);outline-offset:-1px;border-radius:6px'
       : changed ? 'background:var(--yellow-l)' : '';
     const nameBadge = noMaster
-      ? `<div style="font-size:10px;color:var(--red);margin-top:3px;font-weight:500">⚠️ マスタに見つかりません</div>`
+      ? `<div style="font-size:10px;color:var(--red);margin-top:3px;font-weight:500">⚠️ マスタに見つかりません <button onclick="addToMasterFromInvoice('${item.name}','${item.category}',${item.unitPrice||0})" style="background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;margin-left:4px">＋マスタに追加</button></div>`
       : `<div style="font-size:10px;color:var(--accent);margin-top:2px">✓ ${item._master.name}</div>`;
     const candidateHint = noMaster && candidates.length > 0
       ? `<div style="margin-top:4px;font-size:10px;color:var(--text3)">候補:
@@ -2387,7 +2390,8 @@ function renderInvTable() {
     return `<tr id="inv-row-${i}" style="${rowStyle}">
       <td>
         <input class="ei" value="${item.name.replace(/"/g,'&quot;')}"
-          oninput="invItems[${i}].name=this.value;rerenderInvRow(${i})"
+          oninput="invItems[${i}].name=this.value"
+          onblur="rerenderInvRow(${i})"
           style="min-width:110px;${noMaster?'border-color:var(--red)':''}">
         ${nameBadge}${candidateHint}
       </td>
@@ -2492,16 +2496,17 @@ let _pendingInvoiceCallback = null;
 function confirmInvoice() {
   const changed = invItems.filter(i => i._priceChanged);
   if(changed.length > 0) {
-    _pendingPriceChanges = changed.map(item => ({item, newPrice: item.unitPrice}));
-    const list = _pendingPriceChanges.map(pc =>
-      `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:13px">${pc.item.name}</span>
-        <span>
+    _pendingPriceChanges = changed.map((item,i) => ({item, newPrice: item.unitPrice, checked: true, idx: i}));
+    const list = _pendingPriceChanges.map((pc,i) =>
+      `<label style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;gap:10px">
+        <input type="checkbox" id="pcc-${i}" checked style="width:18px;height:18px;cursor:pointer;flex-shrink:0" onchange="_pendingPriceChanges[${i}].checked=this.checked">
+        <span style="flex:1;font-size:13px">${pc.item.name}</span>
+        <span style="white-space:nowrap">
           <span class="pc-old">¥${pc.item._masterPrice.toLocaleString()}</span>
           <span style="margin:0 6px;color:var(--text3)">→</span>
           <span class="pc-new">¥${pc.item.unitPrice.toLocaleString()}</span>
         </span>
-      </div>`
+      </label>`
     ).join('');
     document.getElementById('priceChangeList').innerHTML = list;
     document.getElementById('priceModalOverlay').classList.add('open');
@@ -2512,7 +2517,7 @@ function confirmInvoice() {
 }
 
 function applyPriceChanges() {
-  _pendingPriceChanges.forEach(pc => {
+  _pendingPriceChanges.filter(pc => pc.checked).forEach(pc => {
     const master = pc.item._master;
     if(master) { master.prevPrice = master.price; master.price = pc.item.unitPrice; }
   });
@@ -2527,6 +2532,18 @@ function skipPriceChanges() {
 }
 
 function closePriceModal() { document.getElementById('priceModalOverlay').classList.remove('open'); }
+
+function addToMasterFromInvoice(name, category, price) {
+  const shIdx = category && category.includes('包材') ? 2 : 0; // 包材→2番目, それ以外→0番目(だるまや等)
+  const sh = SHEETS[shIdx] || SHEETS[0];
+  const id = 'inv_' + Date.now().toString(36);
+  sh.items.push({ id, name, unit:'個', price: price||0, prevPrice: price||0, qty:null, tanaUnit:null, unitLabel:null });
+  saveLS('ls_sheets', SHEETS);
+  SHEETS = loadLS('ls_sheets', SHEETS);
+  showToast('✓ 「' + name + '」を品目マスタに追加しました');
+  // 伝票結果を再描画
+  renderInvResult && renderInvResult();
+}
 
 function doImportInvoice(priceUpdated) {
   const month = document.getElementById('monthSel').value;
