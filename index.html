@@ -1567,6 +1567,10 @@ function changeMonth(v) {
 // ════════════════════════════════════════════════════════════════════════
 
 function renderDash() {
+  // 表示月のデータを必ず再ロード
+  shiireData = loadLS(shiireKey(), []);
+  airegiData = loadLS(airegiKey(), null);
+  fixedCosts = loadLS(fixedKey(), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
   const ar = airegiData;
   const tanaTotal = calcGrandTotal();
   const shiireTotal = shiireData.reduce((s,r)=>s+r.amount,0);
@@ -1808,6 +1812,8 @@ function renderSales() {
 function renderShiire() {
   document.getElementById('shiireBadge').textContent=document.getElementById('monthSel').value;
   const d=new Date(); document.getElementById('s-date').value=d.toISOString().split('T')[0];
+  // 表示中の月のデータを必ず再ロード
+  shiireData = loadLS(shiireKey(), []);
   renderShiireTable();
 }
 function renderShiireTable() {
@@ -2112,6 +2118,10 @@ function calcPrevTotal() {
 }
 
 function renderMonthly() {
+  // 表示月のデータを必ず再ロード
+  shiireData = loadLS(shiireKey(), []);
+  airegiData = loadLS(airegiKey(), null);
+  fixedCosts = loadLS(fixedKey(), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
   document.getElementById('monthlyBadge').textContent = document.getElementById('monthSel').value;
   const tanaTotal   = calcGrandTotal();
   const shiireTotal = shiireData.reduce((s,r) => s+r.amount, 0);
