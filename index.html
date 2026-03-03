@@ -1821,7 +1821,7 @@ function renderShiireTable() {
   document.getElementById('shiireTotal').textContent=yen(total);
   const cc={'食材':'t-food','包材':'t-pack','道具':'t-pack','その他':'t-unk'};
   document.getElementById('shiireTable').innerHTML=[...shiireData].reverse().map((r,ri)=>`
-    <tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">${r.date}</td>
+    <tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">${(()=>{const p=r.date.split('/');return p.length>=3?parseInt(p[1])+'/'+parseInt(p[2]):r.date;})()}</td>
     <td>${r.vendor}</td>
     <td><span class="tag ${cc[r.cat]||'t-unk'}">${r.cat}</span></td>
     <td class="r">${yen(r.amount)}</td>
@@ -1837,7 +1837,7 @@ function addShiire() {
   const memo=document.getElementById('s-memo').value;
   if(!amount){showToast('金額を入力してください');return;}
   const p=date.split('-');
-  const entry = {date:`${parseInt(p[1])}/${parseInt(p[2])}`,vendor,amount,cat,memo};
+  const entry = {date:`${p[0]}/${p[1]}/${parseInt(p[2])}`,vendor,amount,cat,memo};
 
   // 日付の月に自動振り分け
   const entryMonthKey = 'ls_shiire_' + p[0] + '-' + p[1];
@@ -2598,7 +2598,7 @@ function doImportInvoice(priceUpdated) {
   const month = document.getElementById('monthSel').value;
   const records = loadLS(shiireKey(), []);
   const vendor = _lastVendor || '不明';
-  const date = document.getElementById('invDate').textContent || today();
+  const date = document.getElementById('invDate').textContent || today(); // 年/月/日形式
   invItems.forEach(item => {
     if(!item.amount || item.amount === 0) return;
     records.push({
@@ -2769,6 +2769,37 @@ async function saveMonthSnapshot() {
   if(idx >= 0) hist[idx] = entry; else hist.push(entry);
   saveLS('ls_monthly_history', hist);
   showToast('✓ ' + month + ' の月次データを記録しました');
+}
+
+// 既存の年なし日付データを月別キーに正しく移行
+function migrateLegacyShiire() {
+  const sel = document.getElementById('monthSel');
+  if(!sel) return;
+  // 全shiireキーをチェック
+  Object.keys(localStorage).filter(k=>k.startsWith('ls_shiire_')).forEach(key => {
+    const data = JSON.parse(localStorage.getItem(key) || '[]');
+    const keyMonth = key.replace('ls_shiire_',''); // 例: 2026-03
+    let changed = false;
+    const keep = [];
+    data.forEach(r => {
+      const p = r.date.split('/');
+      if(p.length === 2) {
+        // 年がない → キーの月年から推定して正しいキーに移動
+        const [ky, km] = keyMonth.split('-');
+        const correctKey = 'ls_shiire_' + ky + '-' + p[0].padStart(2,'0');
+        const newDate = ky + '/' + p[0].padStart(2,'0') + '/' + parseInt(p[1]);
+        const arr = JSON.parse(localStorage.getItem(correctKey) || '[]');
+        // 重複チェック
+        const dup = arr.some(x=>x.date===newDate&&x.amount===r.amount&&x.vendor===r.vendor);
+        if(!dup) { arr.push({...r, date: newDate}); localStorage.setItem(correctKey, JSON.stringify(arr)); }
+        if(correctKey !== key) changed = true;
+        else keep.push({...r, date: newDate});
+      } else if(p.length === 3) {
+        keep.push(r);
+      }
+    });
+    if(changed) localStorage.setItem(key, JSON.stringify(keep));
+  });
 }
 
 function updateSyncStatus() {
@@ -3011,6 +3042,7 @@ function importLocalData(input) {
   }
 })();
 
+migrateLegacyShiire();
 updateSyncStatus();
 updateApiKeyStatus();
 updateTanaMonthLabel();
