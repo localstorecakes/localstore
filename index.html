@@ -2027,9 +2027,11 @@ function startNextMonth() {
     const nextKey = 'ls_stocks_' + nextVal.replace('/', '-');
     const nextStocks = {};
     Object.keys(stocks).forEach(id => {
-      if(stocks[id] && stocks[id].prevStock !== undefined) {
-        nextStocks[id] = { prevStock: stocks[id].prevStock };
-      }
+      const s = stocks[id];
+      if(!s) return;
+      // prevStock優先、なければstockをprevStockとして引継ぎ
+      const prev = s.prevStock !== undefined ? s.prevStock : (s.stock !== undefined ? s.stock : null);
+      if(prev !== null) nextStocks[id] = { prevStock: prev };
     });
     localStorage.setItem(nextKey, JSON.stringify(nextStocks));
 
