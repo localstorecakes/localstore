@@ -1472,9 +1472,21 @@ function stocksKey(m) {
   const month = m || document.getElementById('monthSel')?.value || '2026/02';
   return 'ls_stocks_' + month.replace('/', '-');
 }
+function shiireKey(m) {
+  const month = m || document.getElementById('monthSel')?.value || '2026/02';
+  return 'ls_shiire_' + month.replace('/', '-');
+}
+function airegiKey(m) {
+  const month = m || document.getElementById('monthSel')?.value || '2026/02';
+  return 'ls_airegi_' + month.replace('/', '-');
+}
+function fixedKey(m) {
+  const month = m || document.getElementById('monthSel')?.value || '2026/02';
+  return 'ls_fixed_' + month.replace('/', '-');
+}
 let stocks = loadLS(stocksKey(), JSON.parse(JSON.stringify(DEFAULT_STOCKS)));
-let shiireData = loadLS('ls_shiire', []);
-let airegiData = loadLS('ls_airegi', null);
+let shiireData = loadLS(shiireKey(), []);
+let airegiData = loadLS(airegiKey(), null);
 let curPage = 'dash';
 let curTanaTab = 0;
 let openCard = null;
@@ -1530,8 +1542,11 @@ function closeSidebar() {
   document.getElementById('overlayBg').classList.remove('show');
 }
 function changeMonth(v) {
-  // 月切替時にその月のstocksを読み込む
+  // 月切替時にその月のデータを全部読み込む
   stocks = loadLS(stocksKey(v), JSON.parse(JSON.stringify(DEFAULT_STOCKS)));
+  shiireData = loadLS(shiireKey(v), []);
+  airegiData = loadLS(airegiKey(v), null);
+  fixedCosts = loadLS(fixedKey(v), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
   // 右上バッジを更新
   const badge = document.getElementById('tbBadge');
   if(badge && v) {
@@ -1568,18 +1583,11 @@ function renderDash() {
     {l:'粗利（概算）',v:yen(rawProfit),          sub:'売上−仕入',cls:'k-purple'},
   ].map(k=>`<div class="kpi ${k.cls}"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
-  // Trend bars: 月次履歴から動的生成
+  // Trend bars: 月次履歴から動的生成（「今月分を記録する」で保存したデータのみ表示）
   const monthlyHist = loadLS('ls_monthly_history', []);
-  // 現在選択中の月も含めて最新6ヶ月分を構築
   const selM = document.getElementById('monthSel')?.value || '';
   const histMap = {};
   monthlyHist.forEach(h => { histMap[h.month] = h; });
-  // 今月のデータを追加（リアルタイム）
-  if(selM) {
-    const curSales = ar ? ar.reduce((s,d)=>s+d.sales,0) : 0;
-    const curCost  = shiireData.reduce((s,r)=>s+r.amount,0);
-    histMap[selM] = { month:selM, totalSales:curSales, rawCost:curCost, grossProfit:curSales-curCost };
-  }
   // 直近6ヶ月のキーを生成
   const now2 = new Date();
   const recentMonths = [];
@@ -1603,8 +1611,8 @@ function renderDash() {
     trendEl.innerHTML = dynHist.map(d=>`
       <div class="t-grp">
         <div class="t-inner">
-          <div class="t-bar bs" style="height:${d.s/maxS*62}px" title="${yen(d.s)}"></div>
-          <div class="t-bar bc" style="height:${d.c/maxS*62}px" title="${yen(d.c)}"></div>
+          <div class="t-bar bs" style="height:${Math.max(0,d.s)/maxS*62}px" title="${yen(d.s)}"></div>
+          <div class="t-bar bc" style="height:${Math.max(0,d.c)/maxS*62}px" title="${yen(d.c)}"></div>
           <div class="t-bar bp" style="height:${Math.max(0,d.p)/maxS*62}px" title="${yen(d.p)}"></div>
         </div>
         <div class="t-lbl">${d.m}</div>
@@ -1639,8 +1647,8 @@ function renderDash() {
   const tagCls={food:'t-food',pack:'t-pack',fixed:'t-fixed',salary:'t-salary',card:'t-card',sale:'t-sale',unk:'t-unk'};
   const selMonth = document.getElementById('monthSel')?.value || '';
   const selYM = selMonth.replace('/', '-'); // 例: "2026-02"
-  const shiire = loadLS('ls_shiire', []);
-  const fixed  = loadLS('ls_fixed_costs', []);
+  const shiire = loadLS(shiireKey(), []);
+  const fixed  = loadLS(fixedKey(), []);
   const txList = [];
 
   // 仕入台帳
@@ -1824,13 +1832,13 @@ function addShiire() {
   if(!amount){showToast('金額を入力してください');return;}
   const p=date.split('-');
   shiireData.push({date:`${parseInt(p[1])}/${parseInt(p[2])}`,vendor,amount,cat,memo});
-  saveLS('ls_shiire',shiireData);
+  saveLS(shiireKey(),shiireData);
   document.getElementById('s-amount').value='';
   document.getElementById('s-memo').value='';
   renderShiireTable();
   showToast('✓ 追加しました');
 }
-function delShiire(idx) { shiireData.splice(idx,1); saveLS('ls_shiire',shiireData); renderShiireTable(); }
+function delShiire(idx) { shiireData.splice(idx,1); saveLS(shiireKey(),shiireData); renderShiireTable(); }
 
 // ════════════════════════════════════════════════════════════════════════
 // 棚卸
@@ -1989,7 +1997,7 @@ function startNextMonth() {
   // 今月のキーで保存（月セレクタ変更前）
   const curMonthKey = stocksKey();
   saveLS(curMonthKey, stocks);
-  saveLS('ls_airegi', null);
+  saveLS(airegiKey(), null);
 
   // 月セレクタを翌月に進める
   const sel = document.getElementById('monthSel');
@@ -2078,7 +2086,7 @@ const DEFAULT_FIXED_COSTS = [
   {id:'fc10',name:'ヤマト送料', amount:825},
 ];
 
-let fixedCosts = loadLS('ls_fixed_costs', JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
+let fixedCosts = loadLS(fixedKey(), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
 
 // 期首在庫合計（prevStock × 単価）
 function calcPrevTotal() {
@@ -2216,7 +2224,7 @@ function saveFixedCost() {
   } else {
     fixedCosts.push({ id:'fc'+Date.now(), name, amount });
   }
-  saveLS('ls_fixed_costs', fixedCosts);
+  saveLS(fixedKey(), fixedCosts);
   closeFixedCostModal();
   renderFixedCostRows();
   showToast(editId ? '✓ 更新しました' : '✓ 追加しました');
@@ -2224,7 +2232,7 @@ function saveFixedCost() {
 function deleteFixedCost(id) {
   if(!confirm('この項目を削除しますか？')) return;
   fixedCosts = fixedCosts.filter(r=>r.id!==id);
-  saveLS('ls_fixed_costs', fixedCosts);
+  saveLS(fixedKey(), fixedCosts);
   renderFixedCostRows();
   showToast('削除しました');
 }
@@ -2567,7 +2575,7 @@ function addToMasterFromInvoice(name, category, price) {
 
 function doImportInvoice(priceUpdated) {
   const month = document.getElementById('monthSel').value;
-  const records = loadLS('ls_shiire', []);
+  const records = loadLS(shiireKey(), []);
   const vendor = _lastVendor || '不明';
   const date = document.getElementById('invDate').textContent || today();
   invItems.forEach(item => {
@@ -2579,7 +2587,7 @@ function doImportInvoice(priceUpdated) {
       qty: item.qty, unit: item.unit, unitPrice: item.unitPrice
     });
   });
-  saveLS('ls_shiire', records);
+  saveLS(shiireKey(), records);
   const total = invItems.reduce((s,i)=>s+(i.amount||0),0);
   document.getElementById('invSuccess').classList.add('show');
   document.getElementById('invSuccessSub').textContent = `${vendor} / ${yen(total)} / ${invItems.length}品目`;
@@ -2616,7 +2624,7 @@ function parseAiregiCSV(text) {
     category: r['カテゴリ']||r['分類']||'',
     payType: r['支払い方法']||r['決済方法']||''
   }));
-  saveLS('ls_airegi', salesData);
+  airegiData = salesData; saveLS(airegiKey(), salesData);
   showToast(`✓ ${salesData.length}件の売上データを取り込みました`);
   renderSales();
 }
@@ -2666,9 +2674,9 @@ async function syncNow(direction) {
     const values = {
       stocks: loadLS(stocksKey(), stocks),
       sheets: SHEETS,
-      shiire: loadLS('ls_shiire', []),
-      fixedCosts: loadLS('ls_fixed_costs', []),
-      airegi: loadLS('ls_airegi', []),
+      shiire: loadLS(shiireKey(), []),
+      fixedCosts: loadLS(fixedKey(), []),
+      airegi: loadLS(airegiKey(), []),
     };
     for(const key of keys) {
       const res = await fetch(url, {
@@ -2700,9 +2708,9 @@ async function pullFromGas() {
     const data = await res.json();
     if(data.stocks) { stocks = data.stocks; saveLS(stocksKey(), stocks); }
     if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
-    if(data.shiire) { saveLS('ls_shiire', data.shiire); }
-    if(data.fixedCosts) { saveLS('ls_fixed_costs', data.fixedCosts); }
-    if(data.airegi) { saveLS('ls_airegi', data.airegi); }
+    if(data.shiire) { shiireData = data.shiire; saveLS(shiireKey(), data.shiire); }
+    if(data.fixedCosts) { saveLS(fixedKey(), data.fixedCosts); }
+    if(data.airegi) { saveLS(airegiKey(), data.airegi); }
     localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
     updateSyncStatus();
     renderTana(); renderMaster();
@@ -2715,9 +2723,9 @@ async function saveMonthSnapshot() {
   const url = getGasUrl();
   if(!url) return;
   const month = document.getElementById('monthSel').value;
-  const airegi = loadLS('ls_airegi', []);
-  const shiire = loadLS('ls_shiire', []);
-  const fixedCosts = loadLS('ls_fixedCosts', DEFAULT_FIXED_COSTS);
+  const airegi = loadLS(airegiKey(), []);
+  const shiire = loadLS(shiireKey(), []);
+  const fixedCosts = loadLS(fixedKey(), DEFAULT_FIXED_COSTS);
   const totalSales = airegi.reduce((s,r)=>s+r.price,0);
   const rawCost = shiire.reduce((s,r)=>s+r.amount,0);
   const fixedTotal = fixedCosts.reduce((s,f)=>s+f.amount,0);
@@ -2894,7 +2902,7 @@ function updateApiKeyStatus() {
 
 function resetAiregiData() {
   if(!confirm('売上データ（AirレジCSV）を削除します。\n棚卸・仕入台帳・品目マスタは残ります。\n\nよろしいですか？')) return;
-  saveLS('ls_airegi', []);
+  saveLS(airegiKey(), []);
   showToast('✓ 売上データを削除しました');
   if(curPage === 'dash')  { renderDash?.(); }
   if(curPage === 'sales') renderSales();
@@ -2928,9 +2936,9 @@ function exportLocalData() {
   const data = {
     stocks: loadLS(stocksKey(), {}),
     sheets: loadLS('ls_sheets', []),
-    shiire: loadLS('ls_shiire', []),
-    fixedCosts: loadLS('ls_fixedCosts', []),
-    airegi: loadLS('ls_airegi', []),
+    shiire: loadLS(shiireKey(), []),
+    fixedCosts: loadLS(fixedKey(), []),
+    airegi: loadLS(airegiKey(), []),
     exported: new Date().toISOString()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
@@ -2948,9 +2956,9 @@ function importLocalData(input) {
       const data = JSON.parse(e.target.result);
       if(data.stocks) { stocks = data.stocks; saveLS(stocksKey(), stocks); }
       if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
-      if(data.shiire) saveLS('ls_shiire', data.shiire);
-      if(data.fixedCosts) saveLS('ls_fixedCosts', data.fixedCosts);
-      if(data.airegi) saveLS('ls_airegi', data.airegi);
+      if(data.shiire) { shiireData = data.shiire; saveLS(shiireKey(), data.shiire); }
+      if(data.fixedCosts) saveLS(fixedKey(), data.fixedCosts);
+      if(data.airegi) saveLS(airegiKey(), data.airegi);
       renderTana(); renderMaster(); renderDash();
       showToast('✓ バックアップから復元しました');
     } catch(err) { showToast('JSONの読み込みに失敗しました'); }
@@ -3027,9 +3035,9 @@ nav('dash');
     let updated = false;
     if(data.stocks) { stocks = data.stocks; saveLS(stocksKey(), stocks); updated = true; }
     if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); updated = true; }
-    if(data.shiire) { saveLS('ls_shiire', data.shiire); updated = true; }
-    if(data.fixedCosts) { saveLS('ls_fixed_costs', data.fixedCosts); updated = true; }
-    if(data.airegi) { saveLS('ls_airegi', data.airegi); updated = true; }
+    if(data.shiire) { shiireData = data.shiire; saveLS(shiireKey(), data.shiire); updated = true; }
+    if(data.fixedCosts) { saveLS(fixedKey(), data.fixedCosts); updated = true; }
+    if(data.airegi) { saveLS(airegiKey(), data.airegi); updated = true; }
 
     if(updated) {
       localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
@@ -3050,7 +3058,7 @@ const _origSaveLS = saveLS;
 function saveLS(key, val) {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
   // stocks や shiire の保存時は編集時刻を更新
-  if(key.startsWith('ls_stocks_') || key === 'ls_shiire' || key === 'ls_sheets') {
+  if(key.startsWith('ls_stocks_') || key.startsWith('ls_shiire_') || key.startsWith('ls_airegi_') || key.startsWith('ls_fixed_') || key === 'ls_sheets') {
     localStorage.setItem('ls_last_edit', new Date().toISOString());
   }
 }
