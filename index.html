@@ -1831,12 +1831,23 @@ function addShiire() {
   const memo=document.getElementById('s-memo').value;
   if(!amount){showToast('金額を入力してください');return;}
   const p=date.split('-');
-  shiireData.push({date:`${parseInt(p[1])}/${parseInt(p[2])}`,vendor,amount,cat,memo});
-  saveLS(shiireKey(),shiireData);
+  const entry = {date:`${parseInt(p[1])}/${parseInt(p[2])}`,vendor,amount,cat,memo};
+
+  // 日付の月に自動振り分け
+  const entryMonthKey = 'ls_shiire_' + p[0] + '-' + p[1];
+  const targetData = JSON.parse(localStorage.getItem(entryMonthKey) || '[]');
+  targetData.push(entry);
+  localStorage.setItem(entryMonthKey, JSON.stringify(targetData));
+
+  // 表示中の月と一致する場合はshiireDataも更新
+  if(entryMonthKey === shiireKey()) {
+    shiireData = targetData;
+  }
+
   document.getElementById('s-amount').value='';
   document.getElementById('s-memo').value='';
   renderShiireTable();
-  showToast('✓ 追加しました');
+  showToast('✓ ' + p[0] + '年' + parseInt(p[1]) + '月分に追加しました');
 }
 function delShiire(idx) { shiireData.splice(idx,1); saveLS(shiireKey(),shiireData); renderShiireTable(); }
 
