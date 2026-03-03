@@ -1573,7 +1573,7 @@ function renderDash() {
 
   // KPI – use real airegi if loaded
   const totalSales = ar ? ar.reduce((s,d)=>s+d.sales,0) : 0;
-  const totalCust  = ar ? ar.reduce((s,d)=>s+d.customers,0) : 352;
+  const totalCust  = ar ? ar.reduce((s,d)=>s+d.customers,0) : 0;
   const rawProfit  = totalSales - shiireTotal;
   document.getElementById('dashKpi').innerHTML = [
     {l:'税込売上',   v:yen(totalSales),         sub: ar?'Airレジ実データ':'推定値',cls:'k-green'},
