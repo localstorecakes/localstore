@@ -1576,8 +1576,8 @@ function renderDash() {
   const shiireTotal = shiireData.reduce((s,r)=>s+r.amount,0);
 
   // KPI – use real airegi if loaded
-  const totalSales = ar ? ar.reduce((s,d)=>s+d.sales,0) : 0;
-  const totalCust  = ar ? ar.reduce((s,d)=>s+d.customers,0) : 0;
+  const totalSales = (ar && ar.length>0) ? ar.reduce((s,d)=>s+d.sales,0) : 0;
+  const totalCust  = (ar && ar.length>0) ? ar.reduce((s,d)=>s+d.customers,0) : 0;
   const rawProfit  = totalSales - shiireTotal;
   document.getElementById('dashKpi').innerHTML = [
     {l:'税込売上',   v:yen(totalSales),         sub: ar?'Airレジ実データ':'推定値',cls:'k-green'},
@@ -1692,9 +1692,9 @@ function renderDash() {
 
 function renderSales() {
   const data = airegiData;
-  document.getElementById('salesNoData').style.display = data ? 'none' : 'block';
-  document.getElementById('salesDashboard').style.display = data ? 'block' : 'none';
-  if(!data) return;
+  document.getElementById('salesNoData').style.display = (data && data.length > 0) ? 'none' : 'block';
+  document.getElementById('salesDashboard').style.display = (data && data.length > 0) ? 'block' : 'none';
+  if(!data || data.length === 0) return;
 
   const totalS = data.reduce((s,d)=>s+d.sales,0);
   const totalC = data.reduce((s,d)=>s+d.customers,0);
@@ -2126,7 +2126,7 @@ function renderMonthly() {
   const tanaTotal   = calcGrandTotal();
   const shiireTotal = shiireData.reduce((s,r) => s+r.amount, 0);
   const ar          = airegiData;
-  const totalSales  = ar ? ar.reduce((s,d) => s+d.sales, 0) : 0;
+  const totalSales  = (ar && ar.length>0) ? ar.reduce((s,d) => s+d.sales, 0) : 0;
   const rawCost     = shiireTotal;
   const grossProfit = totalSales - rawCost;
   const fixedTotal  = fixedCosts.reduce((s,r) => s+r.amount, 0);
