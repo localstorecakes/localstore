@@ -3141,13 +3141,11 @@ nav('dash');
       }
     }
 
-    // データを反映
+    // データを反映（shiire・airegiは月別管理のため起動時は上書きしない）
     let updated = false;
     if(data.stocks) { stocks = data.stocks; saveLS(stocksKey(), stocks); updated = true; }
     if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); updated = true; }
-    if(data.shiire) { shiireData = data.shiire; saveLS(shiireKey(), data.shiire); updated = true; }
-    if(data.fixedCosts) { saveLS(fixedKey(), data.fixedCosts); updated = true; }
-    if(data.airegi) { saveLS(airegiKey(), data.airegi); updated = true; }
+    // shiire・airegiは手動同期のみ上書き（自動同期では重複になるため）
 
     if(updated) {
       localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
