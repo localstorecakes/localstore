@@ -2621,19 +2621,22 @@ function doImportInvoice(priceUpdated) {
 
 function handleAiregiFile(input) {
   const file = input.files[0]; if(!file) return;
-  // まずCP932(Shift-JIS)で読み込み、失敗したらUTF-8で再試行
+  // ArrayBufferで読み込んでTextDecoderでShift-JISデコード
   const reader = new FileReader();
   reader.onload = e => {
-    const text = e.target.result;
-    if(text.includes('\uFFFD')) {
-      const r2 = new FileReader();
-      r2.onload = e2 => parseAiregiCSV(e2.target.result);
-      r2.readAsText(file, 'UTF-8');
-    } else {
-      parseAiregiCSV(text);
+    const buf = e.target.result;
+    const encodings = ['shift-jis', 'utf-8'];
+    let text = null;
+    for(const enc of encodings) {
+      try {
+        const decoded = new TextDecoder(enc, {fatal: true}).decode(buf);
+        if(!decoded.includes('\uFFFD')) { text = decoded; break; }
+      } catch(e) {}
     }
+    if(!text) text = new TextDecoder('shift-jis').decode(buf);
+    parseAiregiCSV(text);
   };
-  reader.readAsText(file, 'CP932');
+  reader.readAsArrayBuffer(file);
 }
 
 function parseAiregiCSV(text) {
