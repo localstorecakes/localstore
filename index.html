@@ -881,13 +881,10 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
   <div class="sec-title">Airレジ CSV 取込 <span class="s-badge">売上分析</span></div>
   <div class="info-banner banner-yellow">💡 Airレジ バックオフィス → レポート → 売上集計 → CSV出力 からエクスポートしてください</div>
   <div class="csv-upload" id="csvZone">
-    <input type="file" accept=".csv,text/csv" id="csvInput" onchange="handleCSV(this)">
+    <input type="file" accept=".csv,text/csv" id="csvInput" onchange="handleAiregiFile(this)">
     <div class="upload-icon">📊</div>
     <div class="upload-title">Airレジ CSV をドロップ</div>
     <div class="upload-sub">または <span style="color:var(--blue);font-weight:500">クリックしてファイルを選択</span></div>
-  </div>
-  <div style="text-align:center;margin-bottom:20px">
-    <button class="btn btn-sec" onclick="loadSampleAiregi()" style="font-size:12px">📋 サンプルデータで試す（1月分）</button>
   </div>
   <div id="airegiPreview" style="display:none">
     <div class="info-banner banner-green" id="airegiLoadedBanner"></div>
@@ -2630,26 +2627,53 @@ function handleAiregiFile(input) {
 }
 
 function parseAiregiCSV(text) {
-  const lines = text.split('\n').filter(l=>l.trim());
-  const header = lines[0].split(',').map(h=>h.replace(/"/g,'').trim());
+  // BOM除去・改行正規化
+  text = text.replace(/^\uFEFF/, '');
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if(lines.length < 2) { showToast('CSVデータが空です'); return; }
+  const header = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
+  console.log('AirレジCSVヘッダー:', header);
   const rows = lines.slice(1).map(l => {
-    const cols = l.split(',').map(c=>c.replace(/"/g,'').trim());
+    const cols = l.split(',').map(c => c.replace(/"/g,'').trim());
     const obj = {};
-    header.forEach((h,i) => obj[h] = cols[i]||'');
+    header.forEach((h,i) => obj[h] = cols[i] || '');
     return obj;
-  }).filter(r => r['売上日時']||r['日付']||r['販売日']);
-  if(rows.length === 0) { showToast('CSVのフォーマットが認識できません'); return; }
-  const salesData = rows.map(r => ({
-    date: r['売上日時']||r['日付']||r['販売日']||'',
-    item: r['商品名']||r['メニュー名']||'',
-    qty:  parseInt(r['数量']||r['個数']||'1')||1,
-    price: parseInt((r['売上金額']||r['金額']||r['単価']||'0').replace(/,/g,''))||0,
-    category: r['カテゴリ']||r['分類']||'',
-    payType: r['支払い方法']||r['決済方法']||''
-  }));
-  airegiData = salesData; saveLS(airegiKey(), salesData);
-  showToast(`✓ ${salesData.length}件の売上データを取り込みました`);
+  });
+  const n = s => parseInt((s||'0').replace(/[,，円]/g,'')) || 0;
+  const dateCol = header.find(h => /日付|日時|販売日/.test(h) || h === '日');
+  const salesCol = header.find(h => /売上金額|売上高|合計金額/.test(h));
+  const custCol  = header.find(h => /客数|人数|来店/.test(h));
+  const cashCol  = header.find(h => /現金/.test(h));
+  const clCol    = header.find(h => /キャッシュレス|電子マネー|クレジット/.test(h));
+  const discCol  = header.find(h => /割引|値引/.test(h));
+  const itemCol  = header.find(h => /点数|商品数|品数/.test(h));
+  console.log('日付:', dateCol, '売上:', salesCol, '客数:', custCol);
+  const salesData = rows.map(r => {
+    const ds = dateCol ? r[dateCol] : '';
+    const dm = ds.match(/(\d+)[年\-\/](\d+)[月\-\/](\d+)/);
+    if(!dm) return null;
+    const day = parseInt(dm[3]);
+    const dow = new Date(parseInt(dm[1]), parseInt(dm[2])-1, day).getDay();
+    const sales = n(salesCol ? r[salesCol] : '0');
+    if(sales === 0) return null;
+    return {
+      day, dow, sales,
+      customers: n(custCol ? r[custCol] : '0'),
+      cash:      n(cashCol ? r[cashCol] : '0'),
+      cashless:  n(clCol   ? r[clCol]   : '0'),
+      discount:  n(discCol ? r[discCol] : '0'),
+      items:     n(itemCol ? r[itemCol] : '0'),
+    };
+  }).filter(r => r !== null);
+  if(salesData.length === 0) {
+    showToast('⚠️ データ認識失敗。F12コンソールでヘッダーを確認してください');
+    return;
+  }
+  airegiData = salesData;
+  saveLS(airegiKey(), salesData);
+  showToast('✓ ' + salesData.length + '日分の売上データを取り込みました');
   renderSales();
+  nav('sales');
 }
 
 // ════════════════════════════════════════════════════════════════════════
