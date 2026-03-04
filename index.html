@@ -2798,39 +2798,7 @@ async function saveMonthSnapshot() {
 }
 
 // 既存の年なし日付データを月別キーに正しく移行
-function migrateLegacyShiire() {
-  // 全shiireキーをチェックして日付の月と一致しないデータを正しいキーに移動
-  Object.keys(localStorage).filter(k=>k.startsWith('ls_shiire_')).forEach(key => {
-    const data = JSON.parse(localStorage.getItem(key) || '[]');
-    const keep = [];
-    let changed = false;
-    data.forEach(r => {
-      const p = r.date.split('/');
-      let correctKey = key;
-      let newDate = r.date;
-      if(p.length === 2) {
-        // 年なし(2/17) → キーの年を使って正しいキーへ
-        const ky = key.replace('ls_shiire_','').split('-')[0];
-        newDate = ky + '/' + p[0].padStart(2,'0') + '/' + parseInt(p[1]);
-        correctKey = 'ls_shiire_' + ky + '-' + p[0].padStart(2,'0');
-      } else if(p.length === 3) {
-        // 年あり(2026/02/17) → 日付の年月でキーを決定
-        correctKey = 'ls_shiire_' + p[0] + '-' + p[1];
-      }
-      if(correctKey === key) {
-        keep.push({...r, date: newDate});
-      } else {
-        // 正しいキーに移動
-        const arr = JSON.parse(localStorage.getItem(correctKey) || '[]');
-        const dup = arr.some(x=>x.date===newDate&&x.amount===r.amount&&x.vendor===r.vendor);
-        if(!dup) arr.push({...r, date: newDate});
-        localStorage.setItem(correctKey, JSON.stringify(arr));
-        changed = true;
-      }
-    });
-    if(changed) localStorage.setItem(key, JSON.stringify(keep));
-  });
-}
+function migrateLegacyShiire() { /* 無効化 */ }
 
 function updateSyncStatus() {
   const last = localStorage.getItem('ls_last_sync');
@@ -3072,7 +3040,6 @@ function importLocalData(input) {
   }
 })();
 
-migrateLegacyShiire();
 updateSyncStatus();
 updateApiKeyStatus();
 updateTanaMonthLabel();
