@@ -2621,24 +2621,22 @@ function doImportInvoice(priceUpdated) {
 
 function handleAiregiFile(input) {
   const file = input.files[0]; if(!file) return;
+  // まずCP932(Shift-JIS)で読み込み、失敗したらUTF-8で再試行
   const reader = new FileReader();
   reader.onload = e => {
-    let text = e.target.result;
-    // 文字化けチェック（Shift-JIS の可能性）
-    if(text.includes('\uFFFD') || /[\x80-\x9F]/.test(text)) {
-      // Shift-JIS で再読み込み
-      const reader2 = new FileReader();
-      reader2.onload = e2 => parseAiregiCSV(e2.target.result);
-      reader2.readAsText(file, 'Shift-JIS');
+    const text = e.target.result;
+    if(text.includes('\uFFFD')) {
+      const r2 = new FileReader();
+      r2.onload = e2 => parseAiregiCSV(e2.target.result);
+      r2.readAsText(file, 'UTF-8');
     } else {
       parseAiregiCSV(text);
     }
   };
-  reader.readAsText(file, 'UTF-8');
+  reader.readAsText(file, 'CP932');
 }
 
 function parseAiregiCSV(text) {
-  // BOM除去・改行正規化
   text = text.replace(/^\uFEFF/, '');
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if(lines.length < 2) { showToast('CSVデータが空です'); return; }
@@ -2651,29 +2649,40 @@ function parseAiregiCSV(text) {
     return obj;
   });
   const n = s => parseInt((s||'0').replace(/[,，円]/g,'')) || 0;
-  const dateCol = header.find(h => /日付|日時|販売日/.test(h) || h === '日');
-  const salesCol = header.find(h => /売上金額|売上高|合計金額/.test(h));
-  const custCol  = header.find(h => /客数|人数|来店/.test(h));
-  const cashCol  = header.find(h => /現金/.test(h));
-  const clCol    = header.find(h => /キャッシュレス|電子マネー|クレジット/.test(h));
+  // Airレジ売上集計CSV の列名に対応
+  const dateCol  = header.find(h => /集計期間|日付|日時|販売日/.test(h) || h === '日');
+  const salesCol = header.find(h => /^売上$|売上金額|売上高/.test(h));
+  const custCol  = header.find(h => /^客数$|来店人数/.test(h));
+  const cashCol  = header.find(h => /現金支払合計額|現金支払|^現金$/.test(h));
+  const clCol    = header.find(h => /現金その他|キャッシュレス|電子|クレジット/.test(h));
   const discCol  = header.find(h => /割引|値引/.test(h));
-  const itemCol  = header.find(h => /点数|商品数|品数/.test(h));
+  const itemCol  = header.find(h => /商品数|点数|品数/.test(h));
+  const kaikeiCol = header.find(h => /会計数/.test(h));
   console.log('日付:', dateCol, '売上:', salesCol, '客数:', custCol);
   const salesData = rows.map(r => {
     const ds = dateCol ? r[dateCol] : '';
-    const dm = ds.match(/(\d+)[年\-\/](\d+)[月\-\/](\d+)/);
-    if(!dm) return null;
-    const day = parseInt(dm[3]);
-    const dow = new Date(parseInt(dm[1]), parseInt(dm[2])-1, day).getDay();
+    let day = 0, dow = 0;
+    // 20260201 形式
+    const dm8 = ds.match(/^(\d{4})(\d{2})(\d{2})$/);
+    // 2026/02/01 or 2026-02-01 形式
+    const dmSlash = ds.match(/(\d+)[年\-\/](\d+)[月\-\/](\d+)/);
+    if(dm8) {
+      day = parseInt(dm8[3]);
+      dow = new Date(parseInt(dm8[1]), parseInt(dm8[2])-1, day).getDay();
+    } else if(dmSlash) {
+      day = parseInt(dmSlash[3]);
+      dow = new Date(parseInt(dmSlash[1]), parseInt(dmSlash[2])-1, day).getDay();
+    } else return null;
     const sales = n(salesCol ? r[salesCol] : '0');
     if(sales === 0) return null;
+    // 客数は会計数で代用
+    const customers = n(custCol ? r[custCol] : (kaikeiCol ? r[kaikeiCol] : '0'));
     return {
-      day, dow, sales,
-      customers: n(custCol ? r[custCol] : '0'),
-      cash:      n(cashCol ? r[cashCol] : '0'),
-      cashless:  n(clCol   ? r[clCol]   : '0'),
-      discount:  n(discCol ? r[discCol] : '0'),
-      items:     n(itemCol ? r[itemCol] : '0'),
+      day, dow, sales, customers,
+      cash:     n(cashCol  ? r[cashCol]  : '0'),
+      cashless: n(clCol    ? r[clCol]    : '0'),
+      discount: n(discCol  ? r[discCol]  : '0'),
+      items:    n(itemCol  ? r[itemCol]  : '0'),
     };
   }).filter(r => r !== null);
   if(salesData.length === 0) {
