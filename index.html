@@ -2622,7 +2622,18 @@ function doImportInvoice(priceUpdated) {
 function handleAiregiFile(input) {
   const file = input.files[0]; if(!file) return;
   const reader = new FileReader();
-  reader.onload = e => parseAiregiCSV(e.target.result);
+  reader.onload = e => {
+    let text = e.target.result;
+    // 文字化けチェック（Shift-JIS の可能性）
+    if(text.includes('\uFFFD') || /[\x80-\x9F]/.test(text)) {
+      // Shift-JIS で再読み込み
+      const reader2 = new FileReader();
+      reader2.onload = e2 => parseAiregiCSV(e2.target.result);
+      reader2.readAsText(file, 'Shift-JIS');
+    } else {
+      parseAiregiCSV(text);
+    }
+  };
   reader.readAsText(file, 'UTF-8');
 }
 
