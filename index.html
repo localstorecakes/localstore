@@ -1781,7 +1781,8 @@ function renderSales() {
   }
   document.getElementById('salesDetailBody').innerHTML=data.map(d=>`
     <tr class="${d.day===topDay.day?'highlight':''}">
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">1/${d.day}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">${(()=>{const s=document.getElementById('monthSel')?.value||'';
+const m=s.split('/')[1]||'?';return m+'/'+d.day;})()}</td>
       <td>${dowPill(d.dow)}</td>
       <td class="r" style="${d.day===topDay.day?'color:var(--accent);font-weight:700':''}"> ${yen(d.sales)}</td>
       <td class="r">${d.customers}</td>
@@ -2691,6 +2692,42 @@ function parseAiregiCSV(text) {
   if(salesData.length === 0) {
     showToast('⚠️ データ認識失敗。F12コンソールでヘッダーを確認してください');
     return;
+  }
+  // CSVの日付からYYYYMM特定して正しい月キーに保存
+  const firstRow = rows.find(r => {
+    const ds = dateCol ? r[dateCol] : '';
+    return ds && ds.match(/^(\d{4})(\d{2})(\d{2})$|^\d+[年\-\/]\d+[月\-\/]\d+/);
+  });
+  if(firstRow && dateCol) {
+    const ds = firstRow[dateCol];
+    const dm8 = ds.match(/^(\d{4})(\d{2})(\d{2})$/);
+    const dmSlash = ds.match(/(\d+)[年\-\/](\d+)/);
+    let csvYear, csvMonth;
+    if(dm8) { csvYear = dm8[1]; csvMonth = dm8[2]; }
+    else if(dmSlash) { csvYear = dmSlash[1]; csvMonth = dmSlash[2].padStart(2,'0'); }
+    if(csvYear && csvMonth) {
+      const csvKey = 'ls_airegi_' + csvYear + '-' + csvMonth;
+      // 月セレクタをCSVの月に合わせる
+      const sel = document.getElementById('monthSel');
+      const csvVal = csvYear + '/' + csvMonth;
+      if(sel) {
+        let opt = Array.from(sel.options).find(o => o.value === csvVal);
+        if(!opt) {
+          opt = document.createElement('option');
+          opt.value = csvVal;
+          opt.textContent = csvYear + '年' + parseInt(csvMonth) + '月';
+          sel.insertBefore(opt, sel.options[0]);
+        }
+        sel.value = csvVal;
+        changeMonth(csvVal);
+      }
+      airegiData = salesData;
+      localStorage.setItem(csvKey, JSON.stringify(salesData));
+      showToast('✓ ' + salesData.length + '日分（' + csvYear + '年' + parseInt(csvMonth) + '月）を取り込みました');
+      renderSales();
+      nav('sales');
+      return;
+    }
   }
   airegiData = salesData;
   saveLS(airegiKey(), salesData);
