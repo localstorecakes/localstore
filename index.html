@@ -2386,29 +2386,53 @@ async function analyzeInvoice() {
 }
 
 // Find master item by name (fuzzy: normalize spaces, ignore case)
+// 正規化：全角半角・ひらがなカタカナ・スペース・大文字小文字を統一
+function normStr(s) {
+  return (s||'')
+    .replace(/\s+/g,'')
+    .toLowerCase()
+    // 全角英数→半角
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    // カタカナ→ひらがな
+    .replace(/[\u30A1-\u30F6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+    // 全角記号→半角
+    .replace(/％/g,'%').replace(/　/g,'');
+}
+
 function findMasterByName(name) {
-  const norm = s => s.replace(/\s+/g,'').toLowerCase();
+  const n = normStr(name);
+  // 完全一致
   for(const sh of SHEETS)
     for(const item of sh.items)
-      if(norm(item.name)===norm(name)) return item;
+      if(normStr(item.name) === n) return item;
+  // 部分一致（長い方が短い方を含む）
   for(const sh of SHEETS)
-    for(const item of sh.items)
-      if(norm(name).includes(norm(item.name))||norm(item.name).includes(norm(name))) return item;
+    for(const item of sh.items) {
+      const m = normStr(item.name);
+      if(n.includes(m) || m.includes(n)) return item;
+    }
   return null;
 }
 
 // ── 伝票編集テーブル ──────────────────────────────────────────
 
 function getMasterCandidates(name) {
-  const norm = s => s.replace(/\s+/g,'').toLowerCase();
-  const n = norm(name);
+  const n = normStr(name);
   const results = [];
   for(const sh of SHEETS)
     for(const item of sh.items) {
-      const m = norm(item.name);
+      const m = normStr(item.name);
       if(m === n) return [item];
       if(m.includes(n) || n.includes(m)) results.push(item);
     }
+  // 部分一致なければ先頭2文字で絞り込み
+  if(results.length === 0 && n.length >= 2) {
+    for(const sh of SHEETS)
+      for(const item of sh.items) {
+        const m = normStr(item.name);
+        if(m.startsWith(n.slice(0,2)) || n.startsWith(m.slice(0,2))) results.push(item);
+      }
+  }
   return results.slice(0, 5);
 }
 
@@ -2455,14 +2479,12 @@ function renderInvTable() {
         oninput="invItems[${i}].qty=parseFloat(this.value)||0;invItems[${i}].amount=(invItems[${i}].qty*(invItems[${i}].unitPrice||0));updateInvRowAmount(${i})"
         style="width:55px;text-align:center"></td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;text-align:right">
-        ${changed
-          ? `<span style="color:var(--text3);text-decoration:line-through;font-size:10px">¥${item._masterPrice.toLocaleString()}</span><br><span style="color:var(--red);font-weight:700">¥${item.unitPrice.toLocaleString()}</span>${diffBadge}`
-          : `<input class="ei" type="number" value="${item.unitPrice||0}"
-              oninput="invItems[${i}].unitPrice=parseFloat(this.value)||0;invItems[${i}].amount=(invItems[${i}].qty||0)*(invItems[${i}].unitPrice||0);updateInvRowAmount(${i})"
-              style="width:72px;text-align:right">`
-        }
+        ${changed ? `<span style="color:var(--text3);text-decoration:line-through;font-size:10px">¥${item._masterPrice.toLocaleString()}</span>${diffBadge}<br>` : ''}
+        <input class="ei" type="number" value="${item.unitPrice||0}"
+          oninput="invItems[${i}].unitPrice=parseFloat(this.value)||0;invItems[${i}].amount=(invItems[${i}].qty||0)*(invItems[${i}].unitPrice||0);updateInvRowAmount(${i})"
+          style="width:72px;text-align:right;${changed?'color:var(--red);font-weight:700':''}">
       </td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px;text-align:right;font-weight:500" id="inv-amt-${i}">¥${(item.amount||0).toLocaleString()}</td>
+      <td><input class="ei" type="number" id="inv-amt-${i}" value="${item.amount||0}" oninput="invItems[${i}].amount=parseFloat(this.value)||0;updateInvSummary(_lastVendor)" style="width:80px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;font-weight:500"></td>
       <td><select class="cat-sel" onchange="invItems[${i}].category=this.value" style="min-width:68px">
         <option ${item.category==='食材'?'selected':''}>食材</option>
         <option ${item.category==='包材'?'selected':''}>包材</option>
@@ -2505,7 +2527,7 @@ function rerenderInvRow(i) {
 
 function updateInvRowAmount(i) {
   const el = document.getElementById('inv-amt-'+i);
-  if(el) el.textContent = '¥' + (invItems[i].amount||0).toLocaleString();
+  if(el) el.value = invItems[i].amount||0;
   updateInvSummary(_lastVendor);
 }
 
