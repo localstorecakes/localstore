@@ -2457,11 +2457,14 @@ function renderInvTable() {
           <button onclick="addToMasterFromInvoice('${item.name}','${item.category}',${item.unitPrice||0})" style="background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;margin-left:4px">＋マスタに追加</button>
         </div>`
       : `<div style="font-size:10px;color:var(--accent);margin-top:2px">✓ ${item._master.name}</div>`;
+    // 全マスタ品目をdatalistで提供（常時サジェスト）
+    const allMasterNames = SHEETS.flatMap(sh=>sh.items).map(it=>it.name);
     const candidateHint = noMaster && candidates.length > 0
-      ? `<div style="margin-top:4px;font-size:10px;color:var(--text3)">候補:
-          ${candidates.map(c =>
-            `<span onclick="invItems[${i}].name='${c.name.replace(/'/g,"\\'")}';rerenderInvRow(${i})" style="cursor:pointer;color:var(--accent2);text-decoration:underline;margin-left:4px">${c.name}</span>`
-          ).join('')}
+      ? `<div style="margin-top:4px">
+          <select onchange="if(this.value){invItems[${i}].name=this.value;rerenderInvRow(${i})}" style="font-size:11px;padding:2px 4px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text);max-width:180px">
+            <option value="">── 候補から選ぶ ──</option>
+            ${candidates.map(c=>`<option value="${c.name.replace(/"/g,'&quot;')}">${c.name}</option>`).join('')}
+          </select>
         </div>`
       : '';
     const diffBadge = changed
@@ -2470,9 +2473,13 @@ function renderInvTable() {
     return `<tr id="inv-row-${i}" style="${rowStyle}">
       <td>
         <input class="ei" value="${item.name.replace(/"/g,'&quot;')}"
+          list="master-datalist-${i}"
           oninput="invItems[${i}].name=this.value"
           onblur="rerenderInvRow(${i})"
           style="min-width:110px;${noMaster?'border-color:var(--red)':''}">
+        <datalist id="master-datalist-${i}">
+          ${allMasterNames.map(n=>`<option value="${n.replace(/"/g,'&quot;')}">`).join('')}
+        </datalist>
         ${nameBadge}${candidateHint}
       </td>
       <td><input class="ei" type="number" value="${item.qty}"
