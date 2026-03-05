@@ -841,7 +841,7 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
         <span>✅</span>
         <div>
           <div style="font-size:14px;font-weight:700;color:var(--accent2)" id="invTitle">読み取り完了</div>
-          <div style="font-size:11px;color:var(--text3)" id="invDate"></div>
+          <input type="date" id="invDate" style="font-size:11px;color:var(--text3);border:1px solid var(--border);border-radius:6px;padding:2px 6px;background:var(--bg2)">
         </div>
       </div>
       <div class="result-vendor-badge" id="invVendor"></div>
@@ -1852,8 +1852,12 @@ function addShiire() {
   document.getElementById('s-memo').value='';
   renderShiireTable();
   showToast('✓ ' + p[0] + '年' + parseInt(p[1]) + '月分に追加しました');
+  // GASに即時保存
+  const _sm = p[0] + '/' + p[1];
+  const _sd = JSON.parse(localStorage.getItem(entryMonthKey) || '[]');
+  pushKeyToGas('shiire', _sd, _sm);
 }
-function delShiire(idx) { shiireData.splice(idx,1); saveLS(shiireKey(),shiireData); renderShiireTable(); }
+function delShiire(idx) { shiireData.splice(idx,1); saveLS(shiireKey(),shiireData); renderShiireTable(); pushKeyToGas('shiire', shiireData); }
 
 // ════════════════════════════════════════════════════════════════════════
 // 棚卸
@@ -2084,7 +2088,7 @@ function updateTanaMonthLabel() {
   el.textContent = hasAny ? '（期首あり）' : '';
 }
 
-function saveAll(){saveLS(stocksKey(),stocks);saveLS('ls_sheets',SHEETS);updateProgress();updateTanaTabCounts();renderTanaTabs();showToast(`✓ 保存しました  合計 ${yen(calcGrandTotal())}`);}
+function saveAll(){saveLS(stocksKey(),stocks);saveLS('ls_sheets',SHEETS);updateProgress();updateTanaTabCounts();renderTanaTabs();showToast(`✓ 保存しました  合計 ${yen(calcGrandTotal())}`);pushKeyToGas('stocks',stocks);pushKeyToGas('sheets',SHEETS);}
 
 // ════════════════════════════════════════════════════════════════════════
 // 月次集計 & 固定費管理
@@ -2424,7 +2428,10 @@ function renderInvTable() {
       ? 'background:#fff5f5;outline:1.5px solid var(--red);outline-offset:-1px;border-radius:6px'
       : changed ? 'background:var(--yellow-l)' : '';
     const nameBadge = noMaster
-      ? `<div style="font-size:10px;color:var(--red);margin-top:3px;font-weight:500">⚠️ マスタに見つかりません <button onclick="addToMasterFromInvoice('${item.name}','${item.category}',${item.unitPrice||0})" style="background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;margin-left:4px">＋マスタに追加</button></div>`
+      ? `<div style="font-size:10px;color:var(--red);margin-top:3px;font-weight:500">⚠️ マスタに見つかりません
+          <button onclick="renameAndRematch(${i})" style="background:var(--blue);color:#fff;border:none;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;margin-left:4px">✏️ 名称変更→再検索</button>
+          <button onclick="addToMasterFromInvoice('${item.name}','${item.category}',${item.unitPrice||0})" style="background:var(--accent);color:#fff;border:none;border-radius:4px;font-size:10px;padding:2px 7px;cursor:pointer;margin-left:4px">＋マスタに追加</button>
+        </div>`
       : `<div style="font-size:10px;color:var(--accent);margin-top:2px">✓ ${item._master.name}</div>`;
     const candidateHint = noMaster && candidates.length > 0
       ? `<div style="margin-top:4px;font-size:10px;color:var(--text3)">候補:
@@ -2466,6 +2473,24 @@ function renderInvTable() {
       </td>
     </tr>`;
   }).join('');
+}
+
+function renameAndRematch(i) {
+  const current = invItems[i].name;
+  const newName = prompt('品目名を変更してマスタを再検索します:\n\n現在: ' + current + '\n\n新しい名前を入力してください:', current);
+  if(!newName || newName === current) return;
+  invItems[i].name = newName;
+  const master = findMasterByName(newName);
+  invItems[i]._master = master || null;
+  invItems[i]._masterPrice = master ? master.price : null;
+  invItems[i]._priceChanged = master && invItems[i].unitPrice > 0 && invItems[i].unitPrice !== master.price;
+  renderInvTable();
+  updateInvSummary(_lastVendor);
+  if(master) {
+    showToast('✓ 「' + master.name + '」にマッチしました');
+  } else {
+    showToast('⚠️ 「' + newName + '」もマスタに見つかりません');
+  }
 }
 
 function rerenderInvRow(i) {
@@ -2532,7 +2557,11 @@ function showInvoiceResult(result) {
   });
   _lastVendor = result.vendor;
   document.getElementById('invTitle').textContent = `${result.vendor} — 読み取り完了`;
-  document.getElementById('invDate').textContent = result.date;
+  // 日付をinput[date]形式に変換してセット
+  const _rd = result.date || '';
+  const _rp = _rd.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if(_rp) document.getElementById('invDate').value = _rp[1]+'-'+_rp[2].padStart(2,'0')+'-'+_rp[3].padStart(2,'0');
+  else document.getElementById('invDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('invVendor').textContent = result.vendor;
   renderInvTable();
   updateInvSummary(result.vendor);
@@ -2598,7 +2627,7 @@ function doImportInvoice(priceUpdated) {
   const month = document.getElementById('monthSel').value;
   const records = loadLS(shiireKey(), []);
   const vendor = _lastVendor || '不明';
-  const date = document.getElementById('invDate').textContent || today(); // 年/月/日形式
+  const _dv = document.getElementById('invDate').value; const date = _dv || new Date().toISOString().split('T')[0].replace(/-/g,'/');
   invItems.forEach(item => {
     if(!item.amount || item.amount === 0) return;
     records.push({
@@ -2767,9 +2796,28 @@ async function testGasConnection() {
 }
 function getDeviceRole() { return localStorage.getItem('ls_device_role') || 'owner'; }
 
+
+// ── GAS即時保存ヘルパー ──────────────────────────────────────
+async function pushKeyToGas(key, value, month) {
+  const url = getGasUrl();
+  if(!url) return;
+  const m = month || document.getElementById('monthSel')?.value || '';
+  try {
+    await fetch(url, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ action:'save', key, value, month: m })
+    });
+    localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
+    updateSyncStatus();
+  } catch(e) { console.warn('GAS即時保存失敗:', e.message); }
+}
+
 async function syncNow(direction) {
   if(direction === 'pull') { await pullFromGas(); return; }
-  // push（デフォルト）
+  await pushToGas();
+}
+
+async function pushToGas() {
   const url = getGasUrl();
   if(!url) { showToast('GAS URLが設定されていません'); return; }
   const btn = document.getElementById('syncPushBtn');
@@ -2777,25 +2825,25 @@ async function syncNow(direction) {
   if(btn) btn.textContent = '保存中...';
   try {
     const month = document.getElementById('monthSel')?.value || '';
-    const keys = ['stocks','sheets','shiire','fixedCosts','airegi'];
-    const values = {
-      stocks: loadLS(stocksKey(), stocks),
-      sheets: SHEETS,
-      shiire: loadLS(shiireKey(), []),
-      fixedCosts: loadLS(fixedKey(), []),
-      airegi: loadLS(airegiKey(), []),
-    };
-    for(const key of keys) {
+    // 月別キーでそれぞれ保存
+    const saves = [
+      { key: 'stocks',     value: loadLS(stocksKey(), stocks) },
+      { key: 'sheets',     value: SHEETS },
+      { key: 'shiire',     value: loadLS(shiireKey(), []) },
+      { key: 'fixedCosts', value: loadLS(fixedKey(), []) },
+      { key: 'airegi',     value: loadLS(airegiKey(), null) },
+    ];
+    for(const s of saves) {
       const res = await fetch(url, {
         method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({ action:'save', key, value:values[key], month })
+        body: JSON.stringify({ action:'save', key: s.key, value: s.value, month })
       });
       const data = await res.json();
-      if(!data.ok) throw new Error(key + ': ' + (data.error||'不明'));
+      if(!data.ok) throw new Error(s.key + ': ' + (data.error||'不明'));
     }
     localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
     updateSyncStatus();
-    showToast('✓ スプレッドシートに保存しました');
+    showToast('✓ GASに保存しました（' + month + '）');
   } catch(e) { showToast('同期エラー: ' + e.message); }
   finally { if(btn) btn.textContent = origText; }
 }
@@ -2810,21 +2858,23 @@ async function pullFromGas() {
     const month = document.getElementById('monthSel')?.value || '';
     const res = await fetch(url, {
       method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({ action:'loadAll', keys:['stocks','sheets','shiire','fixedCosts','airegi'], month })
+      body: JSON.stringify({ action:'loadAll', month })
     });
     const data = await res.json();
-    if(data.stocks) { stocks = data.stocks; saveLS(stocksKey(), stocks); }
-    if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
-    if(data.shiire) { shiireData = data.shiire; saveLS(shiireKey(), data.shiire); }
-    if(data.fixedCosts) { saveLS(fixedKey(), data.fixedCosts); }
-    if(data.airegi) { saveLS(airegiKey(), data.airegi); }
+    // 全データをGASの値で上書き（マスターはGAS）
+    if(data.stocks)     { stocks = data.stocks; saveLS(stocksKey(), stocks); }
+    if(data.sheets)     { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
+    if(data.shiire)     { shiireData = data.shiire; saveLS(shiireKey(), data.shiire); }
+    if(data.fixedCosts) { fixedCosts = data.fixedCosts; saveLS(fixedKey(), data.fixedCosts); }
+    if(data.airegi)     { airegiData = data.airegi; saveLS(airegiKey(), data.airegi); }
     localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
     updateSyncStatus();
-    renderTana(); renderMaster();
-    showToast('✓ 最新データを取得しました');
+    renderTana(); renderMaster(); renderShiire(); renderDash?.();
+    showToast('✓ ' + month + ' のデータをGASから取得しました');
   } catch(e) { showToast('取得エラー: ' + e.message); }
   finally { if(btn) btn.textContent = origText; }
 }
+
 
 async function saveMonthSnapshot() {
   const url = getGasUrl();
@@ -3117,59 +3167,31 @@ nav('dash');
 // ── 起動時自動同期 ──────────────────────────────────────
 (async function autoSyncOnStart() {
   const url = getGasUrl();
-  if(!url) return; // GAS未設定なら何もしない
-
+  if(!url) return;
   const month = document.getElementById('monthSel')?.value || '';
-  const lastSync = localStorage.getItem('ls_last_sync');
-  const lastEdit = localStorage.getItem('ls_last_edit');
-
   try {
     showToast('🔄 最新データを確認中...', 2000);
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'loadAll', keys: ['stocks','sheets','shiire','fixedCosts','airegi'], month })
+      body: JSON.stringify({ action: 'loadAll', month })
     });
     const data = await res.json();
-
-    // ローカルに未同期の編集がある場合は確認
-    if(lastEdit && lastSync && new Date(lastEdit) > new Date(lastSync)) {
-      const ok = confirm('ローカルに未同期の編集があります。\nGASの最新データで上書きしますか？\n\n「キャンセル」を押すと今の入力が保持されます。');
-      if(!ok) {
-        showToast('⚠️ 同期をスキップしました（ローカルデータを保持）', 3000);
-        return;
-      }
-    }
-
-    // データを反映（shiire・airegiは月別管理のため起動時は上書きしない）
-    let updated = false;
-    if(data.stocks) { stocks = data.stocks; saveLS(stocksKey(), stocks); updated = true; }
-    if(data.sheets) { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); updated = true; }
-    // shiire・airegiは手動同期のみ上書き（自動同期では重複になるため）
-
-    if(updated) {
-      localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
-      updateSyncStatus();
-      renderTana(); renderMaster();
-      renderDash?.();
-      showToast('✅ 起動時同期完了', 3000);
-    } else {
-      showToast('✅ データは最新です', 2000);
-    }
+    // GASをマスターとして全データ上書き
+    if(data.stocks)     { stocks = data.stocks; saveLS(stocksKey(), stocks); }
+    if(data.sheets)     { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
+    if(data.shiire)     { shiireData = data.shiire; saveLS(shiireKey(), data.shiire); }
+    if(data.fixedCosts) { fixedCosts = data.fixedCosts; saveLS(fixedKey(), data.fixedCosts); }
+    if(data.airegi)     { airegiData = data.airegi; saveLS(airegiKey(), data.airegi); }
+    localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
+    updateSyncStatus();
+    renderTana(); renderMaster(); renderShiire?.(); renderDash?.();
+    showToast('✅ 起動時同期完了（' + month + '）', 3000);
   } catch(e) {
     showToast('⚠️ 起動時同期失敗（オフライン？）', 3000);
   }
 })();
 
-// 保存操作のたびに最終編集時刻を記録
-const _origSaveLS = saveLS;
-function saveLS(key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
-  // stocks や shiire の保存時は編集時刻を更新
-  if(key.startsWith('ls_stocks_') || key.startsWith('ls_shiire_') || key.startsWith('ls_airegi_') || key.startsWith('ls_fixed_') || key === 'ls_sheets') {
-    localStorage.setItem('ls_last_edit', new Date().toISOString());
-  }
-}
 
 </script>
 </body>
