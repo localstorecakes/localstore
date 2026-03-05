@@ -1493,7 +1493,15 @@ let invItems = [];
 let invImgB64 = null, invImgType = 'image/jpeg';
 
 function loadLS(key, def) { try { const d=localStorage.getItem(key); return d?JSON.parse(d):def; } catch(e){return def;} }
-function saveLS(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch(e){} }
+function saveLS(key, val) {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+    // 棚卸・仕入・売上の変更時は編集時刻を記録
+    if(key.startsWith('ls_stocks_') || key.startsWith('ls_shiire_') || key.startsWith('ls_airegi_')) {
+      localStorage.setItem('ls_last_edit', new Date().toISOString());
+    }
+  } catch(e){}
+}
 function showToast(msg, duration) {
   const t = document.getElementById('toast');
   if(!t) return;
@@ -3197,6 +3205,17 @@ nav('dash');
 (async function autoSyncOnStart() {
   const url = getGasUrl();
   if(!url) return;
+
+  // 直近5分以内に編集があればスキップ（作業中の上書き防止）
+  const lastEdit = localStorage.getItem('ls_last_edit');
+  if(lastEdit) {
+    const diffMin = (Date.now() - new Date(lastEdit).getTime()) / 60000;
+    if(diffMin < 5) {
+      showToast('⚠️ 未保存の編集があります。手動で同期してください', 4000);
+      return;
+    }
+  }
+
   const month = document.getElementById('monthSel')?.value || '';
   try {
     showToast('🔄 最新データを確認中...', 2000);
@@ -3206,13 +3225,13 @@ nav('dash');
       body: JSON.stringify({ action: 'loadAll', month })
     });
     const data = await res.json();
-    // GASをマスターとして全データ上書き
     if(data.stocks)     { stocks = data.stocks; saveLS(stocksKey(), stocks); }
     if(data.sheets)     { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
     if(data.shiire)     { shiireData = data.shiire; saveLS(shiireKey(), data.shiire); }
     if(data.fixedCosts) { fixedCosts = data.fixedCosts; saveLS(fixedKey(), data.fixedCosts); }
     if(data.airegi)     { airegiData = data.airegi; saveLS(airegiKey(), data.airegi); }
     localStorage.setItem('ls_last_sync', new Date().toLocaleString('ja-JP'));
+    localStorage.removeItem('ls_last_edit');
     updateSyncStatus();
     renderTana(); renderMaster(); renderShiire?.(); renderDash?.();
     showToast('✅ 起動時同期完了（' + month + '）', 3000);
