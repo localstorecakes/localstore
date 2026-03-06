@@ -2649,14 +2649,14 @@ function skipPriceChanges() {
 function closePriceModal() { document.getElementById('priceModalOverlay').classList.remove('open'); }
 
 function addToMasterFromInvoice(name, category, price) {
-  const shIdx = category && category.includes('包材') ? 2 : 0; // 包材→2番目, それ以外→0番目(だるまや等)
+  const shIdx = category && category.includes('包材') ? 2 : 0;
   const sh = SHEETS[shIdx] || SHEETS[0];
-  const id = 'inv_' + Date.now().toString(36);
+  const id = 'u' + Date.now();
   sh.items.push({ id, name, unit:'個', price: price||0, prevPrice: price||0, qty:null, tanaUnit:null, unitLabel:null });
   saveLS('ls_sheets', SHEETS);
   SHEETS = loadLS('ls_sheets', SHEETS);
+  pushKeyToGas('sheets', SHEETS); // GASに即時保存
   showToast('✓ 「' + name + '」を品目マスタに追加しました');
-  // 伝票結果を再描画
   renderInvResult && renderInvResult();
 }
 
@@ -2675,6 +2675,7 @@ function doImportInvoice(priceUpdated) {
     });
   });
   saveLS(shiireKey(), records);
+  pushKeyToGas('shiire', records); // GASに即時保存
   const total = invItems.reduce((s,i)=>s+(i.amount||0),0);
   document.getElementById('invSuccess').classList.add('show');
   document.getElementById('invSuccessSub').textContent = `${vendor} / ${yen(total)} / ${invItems.length}品目`;
