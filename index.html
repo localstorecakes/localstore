@@ -734,10 +734,10 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="syncNow('push')" id="syncPushBtn">
+      <button class="btn btn-primary" onclick="if(confirm('GASに保存します。\nよろしいですか？'))syncNow('push')" id="syncPushBtn">
         ↑ スプレッドシートに保存
       </button>
-      <button class="btn btn-sec" onclick="syncNow('pull')" id="syncPullBtn">
+      <button class="btn btn-sec" onclick="if(confirm('GASから最新データを取得します。\n現在のローカルデータは上書きされます。\nよろしいですか？'))syncNow('pull')" id="syncPullBtn">
         ↓ 最新データを取得
       </button>
     </div>
@@ -2087,30 +2087,44 @@ async function startNextMonth() {
   nav('tana');
 }
 
-function confirmMonthEnd() {
+async function confirmMonthEnd() {
   const month = document.getElementById('monthSel').value;
   const entered = Object.keys(stocks).length;
   if(entered === 0) { showToast('棚卸データがありません'); return; }
   if(!confirm(`${month} の棚卸を確定して\n翌月の期首在庫に引き継ぎますか？\n\n入力済み品目: ${entered}品目`)) return;
 
-  // 現在の在庫数を prevStock（期首）として保存
+  // 現在の在庫数を prevStock として保存
   Object.keys(stocks).forEach(id => {
     if(stocks[id] && stocks[id].stock !== undefined) {
       stocks[id].prevStock = stocks[id].stock;
     }
   });
   saveLS(stocksKey(), stocks);
-  pushKeyToGas('stocks', stocks); // GASに即時保存
+  await pushKeyToGas('stocks', stocks); // 今月をGASに保存
 
-  // 月次スナップショットも自動保存（GAS連携があれば）
+  // 翌月の期首（prevStock）も更新
+  const [y, m] = month.split('/').map(Number);
+  const nextM = m === 12 ? 1 : m + 1;
+  const nextY = m === 12 ? y + 1 : y;
+  const nextVal = `${nextY}/${String(nextM).padStart(2,'0')}`;
+  const nextKey = 'ls_stocks_' + nextVal.replace('/', '-');
+  const nextStocks = JSON.parse(localStorage.getItem(nextKey) || '{}');
+  // 今月のstockを翌月のprevStockとして上書き
+  Object.keys(stocks).forEach(id => {
+    if(stocks[id] && stocks[id].stock !== undefined) {
+      if(!nextStocks[id]) nextStocks[id] = {};
+      nextStocks[id].prevStock = stocks[id].stock;
+    }
+  });
+  localStorage.setItem(nextKey, JSON.stringify(nextStocks));
+  await pushKeyToGas('stocks', nextStocks, nextVal); // 翌月もGASに保存
+
+  // 月次スナップショット
   const gasUrl = getGasUrl();
-  if(gasUrl) {
-    saveMonthSnapshot().catch(e => console.warn(e));
-  }
+  if(gasUrl) saveMonthSnapshot().catch(e => console.warn(e));
 
-  // 表示更新
   renderTana();
-  showToast(`✓ ${month} 確定！翌月の期首在庫に引き継ぎました`);
+  showToast(`✓ ${month} 確定！${nextY}年${nextM}月の期首に反映しました`);
   updateTanaMonthLabel();
 }
 
@@ -2164,7 +2178,8 @@ function renderMonthly() {
   const shiireTotal = shiireData.reduce((s,r) => s+r.amount, 0);
   const ar          = airegiData;
   const totalSales  = (ar && ar.length>0) ? ar.reduce((s,d) => s+d.sales, 0) : 0;
-  const rawCost     = shiireTotal;
+  const prevTotal   = calcPrevTotal();
+  const rawCost     = prevTotal + shiireTotal - tanaTotal; // 期首+仕入-期末
   const grossProfit = totalSales - rawCost;
   const fixedTotal  = fixedCosts.reduce((s,r) => s+r.amount, 0);
   const teNokori    = grossProfit - fixedTotal;
@@ -2176,7 +2191,7 @@ function renderMonthly() {
   // KPI row
   document.getElementById('monthlyKpi').innerHTML = [
     {l:'税込売上',  v:yen(totalSales),   cls:'k-green', sub: ar?'Airレジ実データ':'推定値'},
-    {l:'原価合計',  v:yen(rawCost),      cls:'k-red',   sub:'仕入台帳より'},
+    {l:'原価合計',  v:yen(rawCost),      cls:'k-red',   sub:'期首+仕入−期末'},
     {l:'粗利益',    v:yen(grossProfit),  cls:'k-blue',  sub:'売上−原価'},
     {l:'固定費合計',v:yen(fixedTotal),   cls:'k-yellow',sub:'編集可'},
   ].map(k=>`<div class="kpi ${k.cls}" style="grid-column:auto"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
