@@ -2024,8 +2024,8 @@ function updateTanaTabCounts(){SHEETS.forEach((sh,i)=>{const filled=sh.items.fil
 // ── 月末確定・期首引継ぎ ──────────────────────────────────────
 
 
-function startNextMonth() {
-  // 今月確定済み（prevStockが設定済み）か確認
+async function startNextMonth() {
+  // 今月確定済みチェック
   const confirmed = Object.values(stocks).some(s => s && s.prevStock !== undefined);
   if(!confirmed) {
     if(!confirm('まだ「今月確定」が押されていません。\n棚卸ページの「📅 今月確定」を先に押すことをお勧めします。\n\nこのまま翌月を開始しますか？')) return;
@@ -2033,55 +2033,57 @@ function startNextMonth() {
     if(!confirm('翌月の棚卸を開始します。\n\n・今月確定の在庫数 → 翌月の期首に引継ぎ\n・当月の棚卸入力はクリア\n\nよろしいですか？')) return;
   }
 
-  // 現在の stock を prevStock として保存し、stock 自体はクリア
-  Object.keys(stocks).forEach(id => {
-    const s = stocks[id];
-    if(!s) return;
-    // prevStock = 今の stock（今月確定済みなら既に正しい値）
-    const keepPrev = s.prevStock !== undefined ? s.prevStock : (s.stock ?? 0);
-    stocks[id] = { prevStock: keepPrev };
-    // price は DEFAULT_SHEETS から取るのでここでは保持しない
-  });
-
-  // 今月のキーで保存（月セレクタ変更前）
-  const curMonthKey = stocksKey();
-  saveLS(curMonthKey, stocks);
-  saveLS(airegiKey(), null);
-
-  // 月セレクタを翌月に進める
   const sel = document.getElementById('monthSel');
-  if(sel && sel.value) {
-    const [y, m] = sel.value.split('/').map(Number);
-    const nextM = m === 12 ? 1 : m + 1;
-    const nextY = m === 12 ? y + 1 : y;
-    const nextVal = `${nextY}/${String(nextM).padStart(2,'0')}`;
-    // 翌月のstocksをprevStockだけにして初期化
-    const nextKey = 'ls_stocks_' + nextVal.replace('/', '-');
-    const nextStocks = {};
-    Object.keys(stocks).forEach(id => {
-      const s = stocks[id];
-      if(!s) return;
-      // prevStock優先、なければstockをprevStockとして引継ぎ
-      const prev = s.prevStock !== undefined ? s.prevStock : (s.stock !== undefined ? s.stock : null);
-      if(prev !== null) nextStocks[id] = { prevStock: prev };
-    });
-    localStorage.setItem(nextKey, JSON.stringify(nextStocks));
+  if(!sel || !sel.value) return;
+  const [y, m] = sel.value.split('/').map(Number);
+  const nextM = m === 12 ? 1 : m + 1;
+  const nextY = m === 12 ? y + 1 : y;
+  const nextVal = `${nextY}/${String(nextM).padStart(2,'0')}`;
+  const curVal = sel.value;
 
-    // 選択肢に翌月がなければ追加
-    let opt = Array.from(sel.options).find(o => o.value === nextVal);
-    if(!opt) {
-      opt = document.createElement('option');
-      opt.value = nextVal;
-      opt.textContent = `${nextY}年${nextM}月`;
-      sel.insertBefore(opt, sel.options[0]);
-    }
-    sel.value = nextVal;
-    stocks = nextStocks;
-    changeMonth(nextVal);
+  // ① 今月の stocks を確定状態で保存
+  const curStocks = loadLS(stocksKey(curVal), {});
+  Object.keys(curStocks).forEach(id => {
+    const s = curStocks[id];
+    if(!s) return;
+    const keepPrev = s.prevStock !== undefined ? s.prevStock : (s.stock ?? 0);
+    curStocks[id] = { prevStock: keepPrev };
+  });
+  localStorage.setItem('ls_stocks_' + curVal.replace('/', '-'), JSON.stringify(curStocks));
+  await pushKeyToGas('stocks', curStocks, curVal);
+
+  // ② 翌月の期首データを作成（GASの既存データより優先して上書き）
+  const nextStocks = {};
+  Object.keys(curStocks).forEach(id => {
+    const s = curStocks[id];
+    if(!s) return;
+    const prev = s.prevStock !== undefined ? s.prevStock : (s.stock !== undefined ? s.stock : null);
+    if(prev !== null) nextStocks[id] = { prevStock: prev };
+  });
+  const nextKey = 'ls_stocks_' + nextVal.replace('/', '-');
+  localStorage.setItem(nextKey, JSON.stringify(nextStocks));
+  await pushKeyToGas('stocks', nextStocks, nextVal);
+
+  // ③ 月セレクタを翌月に切り替え（GAS同期せずlocalStorageから読む）
+  let opt = Array.from(sel.options).find(o => o.value === nextVal);
+  if(!opt) {
+    opt = document.createElement('option');
+    opt.value = nextVal;
+    opt.textContent = `${nextY}年${nextM}月`;
+    sel.insertBefore(opt, sel.options[0]);
   }
+  sel.value = nextVal;
+
+  // ④ グローバル変数を翌月データに更新（changeMonthは呼ばない）
+  stocks = nextStocks;
+  shiireData = loadLS(shiireKey(nextVal), []);
+  airegiData = loadLS(airegiKey(nextVal), null);
+  fixedCosts = loadLS(fixedKey(nextVal), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
+  const badge = document.getElementById('tbBadge');
+  if(badge) badge.textContent = nextY + '年' + nextM + '月';
 
   renderTana();
-  showToast('✓ 翌月の棚卸を開始しました。期首在庫が引き継がれています。');
+  showToast('✓ ' + nextY + '年' + nextM + '月の棚卸を開始しました');
   nav('tana');
 }
 
@@ -2098,6 +2100,7 @@ function confirmMonthEnd() {
     }
   });
   saveLS(stocksKey(), stocks);
+  pushKeyToGas('stocks', stocks); // GASに即時保存
 
   // 月次スナップショットも自動保存（GAS連携があれば）
   const gasUrl = getGasUrl();
