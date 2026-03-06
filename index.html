@@ -1925,7 +1925,7 @@ function itemCardHTML(item) {
           `:''}
           <div class="istock-col">
             ${prevStock!==null?'<div class="istock-col-lbl">当月</div>':''}
-            <div class="istock">${hasVal?s.stock:'−'}</div>
+            <div class="istock istock-cur">${hasVal?s.stock:'−'}</div>
             <div class="iunit">${tanaDisplayUnit(item)}</div>
           </div>
         </div>
@@ -1934,11 +1934,11 @@ function itemCardHTML(item) {
     </div>
     <div class="input-panel">
       ${prevStock!==null?`<div class="prev-stock-row"><span class="prev-stock-lbl">期首（前月末）</span><span class="prev-stock-val">${prevStock} ${tanaDisplayUnit(item)}</span></div>`:''}
-      <div class="quick-nums">${[0,0.5,1,2,3,5,10].map(n=>`<div class="qn" onclick="setStock('${item.id}',${n})">${n}</div>`).join('')}</div>
+      <div class="quick-nums">${[0,0.1,0.5,1,2,3,5,10].map(n=>`<div class="qn" onclick="addStock('${item.id}',${n})">${n===0?'0':'+'+n}</div>`).join('')}</div>
       <div class="inp-row"><div class="inp-lbl">${tanaDisplayUnit(item)}</div>
         <div class="qty-wrap">
           <button class="qty-btn" onclick="adjStock('${item.id}',-0.5)">−</button>
-          <input class="stock-inp" type="number" id="si-${item.id}" value="${stockVal}" placeholder="0" step="0.1" min="0" oninput="onStockIn('${item.id}',this.value)" inputmode="decimal">
+          <input class="stock-inp" type="number" id="si-${item.id}" value="${stockVal}" placeholder="0" step="0.1" min="0" oninput="onStockIn('${item.id}',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();moveNextCard('${item.id}');}" inputmode="decimal">
           <button class="qty-btn" onclick="adjStock('${item.id}',0.5)">＋</button>
         </div>
       </div>
@@ -1952,13 +1952,35 @@ function toggleCard(id) {
   if(openCard===id){openCard=null;document.getElementById('card-'+id)?.classList.remove('open');}
   else{if(openCard)document.getElementById('card-'+openCard)?.classList.remove('open');openCard=id;document.getElementById('card-'+id)?.classList.add('open');setTimeout(()=>{const el=document.getElementById('si-'+id);if(el){el.focus();el.select();}},60);}
 }
-function setStock(id,val){const item=findItem(id);if(!item)return;if(!stocks[id])stocks[id]={stock:val,price:item.price};else stocks[id].stock=val;document.getElementById('si-'+id).value=val;updateSub(id);refreshCard(id);saveLS(stocksKey(),stocks);}
-function adjStock(id,delta){const item=findItem(id);if(!item)return;const cur=stocks[id]?.stock??0;const nv=Math.max(0,Math.round((cur+delta)*10)/10);if(!stocks[id])stocks[id]={stock:nv,price:item.price};else stocks[id].stock=nv;document.getElementById('si-'+id).value=nv;updateSub(id);refreshCard(id);saveLS(stocksKey(),stocks);}
-function onStockIn(id,val){const num=parseFloat(val);if(isNaN(num))return;const item=findItem(id);if(!stocks[id])stocks[id]={stock:num,price:item.price};else stocks[id].stock=num;updateSub(id);refreshCard(id);saveLS(stocksKey(),stocks);}
+function addStock(id,delta) {
+  const item=findItem(id);if(!item)return;
+  const prev=stocks[id]?.prevStock;
+  if(delta===0){
+    if(!stocks[id])stocks[id]={stock:0,price:item.price};else stocks[id].stock=0;
+  } else {
+    const cur=stocks[id]?.stock??0;
+    const nv=Math.round((cur+delta)*100)/100;
+    if(!stocks[id])stocks[id]={stock:nv,price:item.price};else stocks[id].stock=nv;
+  }
+  if(prev!==undefined)stocks[id].prevStock=prev;
+  document.getElementById('si-'+id).value=stocks[id].stock;
+  updateSub(id);refreshCard(id);saveLS(stocksKey(),stocks);
+}
+function moveNextCard(currentId) {
+  // 全カードのIDリストを取得して次のカードを開く
+  const allItems = SHEETS.flatMap(sh=>sh.items);
+  const idx = allItems.findIndex(i=>i.id===currentId);
+  if(idx<0||idx>=allItems.length-1) return;
+  const nextId = allItems[idx+1].id;
+  toggleCard(nextId);
+}
+function setStock(id,val){const item=findItem(id);if(!item)return;const prev=stocks[id]?.prevStock;if(!stocks[id])stocks[id]={stock:val,price:item.price};else stocks[id].stock=val;if(prev!==undefined)stocks[id].prevStock=prev;document.getElementById('si-'+id).value=val;updateSub(id);refreshCard(id);saveLS(stocksKey(),stocks);}
+function adjStock(id,delta){const item=findItem(id);if(!item)return;const cur=stocks[id]?.stock??0;const prev=stocks[id]?.prevStock;const nv=Math.max(0,Math.round((cur+delta)*10)/10);if(!stocks[id])stocks[id]={stock:nv,price:item.price};else stocks[id].stock=nv;if(prev!==undefined)stocks[id].prevStock=prev;document.getElementById('si-'+id).value=nv;updateSub(id);refreshCard(id);saveLS(stocksKey(),stocks);}
+function onStockIn(id,val){const num=parseFloat(val);if(isNaN(num))return;const item=findItem(id);const prev=stocks[id]?.prevStock;if(!stocks[id])stocks[id]={stock:num,price:item.price};else stocks[id].stock=num;if(prev!==undefined)stocks[id].prevStock=prev;updateSub(id);refreshCard(id);saveLS(stocksKey(),stocks);}
 function onPriceIn(id,val){const num=parseFloat(val);if(isNaN(num))return;const item=findItem(id);if(!stocks[id])stocks[id]={stock:0,price:num};else stocks[id].price=num;if(item)item.price=num;saveLS('ls_sheets',SHEETS);updateSub(id);saveLS(stocksKey(),stocks);}
 function onUnitChange(id,val){const item=findItem(id);if(item){item.unit=val;saveLS('ls_sheets',SHEETS);}showToast('✓ 単位を更新しました');}
 function updateSub(id){const s=stocks[id];if(!s)return;const item=findItem(id);const el=document.getElementById('sub-'+id);if(el&&item)el.textContent=yen(calcItemAmount(item,s.stock));}
-function refreshCard(id){const card=document.getElementById('card-'+id);if(!card)return;const s=stocks[id];const item=findItem(id);if(s&&s.stock!==undefined&&item){card.classList.add('has-val');const disp=card.querySelector('.istock');if(disp)disp.textContent=s.stock;const chk=card.querySelector('.ichk');if(chk)chk.textContent='✓';const a=calcItemAmount(item,s.stock);const amt=card.querySelector('.iamt');if(amt)amt.textContent=yen(a);else{const r=card.querySelector('.iright');if(r)r.insertAdjacentHTML('beforeend',`<div class="iamt">${yen(a)}</div>`);}}updateProgress();updateTanaTabCounts();}
+function refreshCard(id){const card=document.getElementById('card-'+id);if(!card)return;const s=stocks[id];const item=findItem(id);if(s&&s.stock!==undefined&&item){card.classList.add('has-val');const disp=card.querySelector('.istock-cur');if(disp)disp.textContent=s.stock;const chk=card.querySelector('.ichk');if(chk)chk.textContent='✓';const a=calcItemAmount(item,s.stock);const amt=card.querySelector('.iamt');if(amt)amt.textContent=yen(a);else{const r=card.querySelector('.iright');if(r)r.insertAdjacentHTML('beforeend',`<div class="iamt">${yen(a)}</div>`);}}updateProgress();updateTanaTabCounts();}
 function filterTana(q){const sh=SHEETS[curTanaTab];const list=document.getElementById('itemList');if(!list)return;list.innerHTML=sh.items.filter(i=>i.name.includes(q)).map(i=>itemCardHTML(i)).join('');}
 function findItem(id){for(const sh of SHEETS)for(const item of sh.items)if(item.id===id)return item;return null;}
 // 品目の棚卸金額を計算（入り数があれば単価割り算）
