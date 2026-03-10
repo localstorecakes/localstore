@@ -429,11 +429,11 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
   </div>
   <nav class="sb-nav">
     <div class="sb-section">メイン</div>
-    <div class="sb-item active" id="nav-dash"    onclick="nav('dash')">    <span class="ni">◈</span> ダッシュボード</div>
+    <div class="sb-item active" id="nav-dash"    onclick="nav('monthly')">    <span class="ni">◈</span> ダッシュボード</div>
     <div class="sb-item"        id="nav-sales"   onclick="nav('sales')">   <span class="ni">📊</span> 売上分析</div>
     <div class="sb-item"        id="nav-shiire"  onclick="nav('shiire')">  <span class="ni">▤</span> 仕入台帳</div>
     <div class="sb-item"        id="nav-tana"    onclick="nav('tana')">    <span class="ni">◫</span> 棚卸入力</div>
-    <div class="sb-item"        id="nav-monthly" onclick="nav('monthly')"> <span class="ni">◉</span> 月次集計</div>
+    <div class="sb-item active" id="nav-monthly" onclick="nav('monthly')"> <span class="ni">◉</span> 月次集計</div>
     <div class="sb-section">取込・管理</div>
     <div class="sb-item"        id="nav-invoice" onclick="nav('invoice')"> <span class="ni">📷</span> 伝票 AI読取</div>
     <div class="sb-item"        id="nav-airegi"  onclick="nav('airegi')">  <span class="ni">⇅</span> Airレジ CSV</div>
@@ -458,40 +458,7 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
 </div>
 
 <!-- ═══════════ DASHBOARD ═══════════ -->
-<div class="page active" id="page-dash">
-  <div class="kpi-row" id="dashKpi"></div>
-  <div class="grid-3">
-    <div class="card">
-      <div class="card-title">月次推移（売上 / 原価 / 粗利）</div>
-      <div class="trend-bars" id="trendBars"></div>
-      <div class="legend-row">
-        <div class="leg-item"><div class="leg-dot" style="background:var(--blue)"></div>売上</div>
-        <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>原価</div>
-        <div class="leg-item"><div class="leg-dot" style="background:var(--accent)"></div>粗利</div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">棚卸サマリ <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);text-transform:none;letter-spacing:0">(入力データより)</span></div>
-      <div id="tanaSnapshot"></div>
-    </div>
-  </div>
-  <div class="grid-2">
-    <div>
-      <div class="sec-title" style="margin-bottom:10px">今月の売上（Airレジ） <span class="s-badge" id="salesDataBadge">未取込</span></div>
-      <div class="card" id="salesMiniCard">
-        <div style="text-align:center;padding:20px 0;color:var(--text3);font-size:13px">
-          Airレジ CSVを取込むと売上データが表示されます<br>
-          <button class="btn btn-primary" style="margin-top:12px;font-size:12px;padding:7px 16px" onclick="nav('airegi')">CSV を取込む →</button>
-        </div>
-      </div>
-    </div>
-    <div>
-      <div class="sec-title" style="margin-bottom:10px">最近の取引 <span class="s-badge">freee</span></div>
-      <div class="tbl-wrap"><table><thead><tr><th>日</th><th>取引先</th><th>分類</th><th class="r">金額</th></tr></thead>
-      <tbody id="dashTx"></tbody></table></div>
-    </div>
-  </div>
-</div>
+
 
 <!-- ═══════════ 売上分析 ═══════════ -->
 <div class="page" id="page-sales">
@@ -581,10 +548,28 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
   <div class="tana-content" id="tanaContent"></div>
 </div>
 
-<!-- ═══════════ 月次集計 ═══════════ -->
-<div class="page" id="page-monthly">
+<!-- ═══════════ 月次集計（トップ） ═══════════ -->
+<div class="page active" id="page-monthly">
   <div class="sec-title">月次集計 <span class="s-badge" id="monthlyBadge"></span></div>
   <div class="kpi-row" id="monthlyKpi" style="grid-template-columns:repeat(4,1fr)"></div>
+
+  <!-- 月次推移＋棚卸サマリ -->
+  <div class="grid-3" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-title">月次推移（売上 / 原価）</div>
+      <div class="trend-bars" id="trendBars"></div>
+      <div class="legend-row">
+        <div class="leg-item"><div class="leg-dot" style="background:var(--blue)"></div>売上</div>
+        <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>原価</div>
+        <div class="leg-item"><div class="leg-dot" style="background:var(--accent)"></div>粗利</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">棚卸サマリ</div>
+      <div id="tanaSnapshot"></div>
+    </div>
+  </div>
+
   <div class="grid-2">
     <div class="card">
       <div class="card-title">売上・原価 <span class="s-badge" style="text-transform:none;letter-spacing:0">自動計算</span></div>
@@ -1549,7 +1534,7 @@ const DOW_JP = ['月','火','水','木','金','土','日'];
 // NAVIGATION
 // ════════════════════════════════════════════════════════════════════════
 
-const PAGE_TITLES = {dash:'ダッシュボード',sales:'売上分析',shiire:'仕入台帳',tana:'棚卸入力',monthly:'月次集計',invoice:'伝票 AI読取',airegi:'Airレジ CSV',freee:'freee連携',master:'品目マスタ',settings:'設定・同期'};
+const PAGE_TITLES = {sales:'売上分析',shiire:'仕入台帳',tana:'棚卸入力',monthly:'月次集計',invoice:'伝票 AI読取',airegi:'Airレジ CSV',freee:'freee連携',master:'品目マスタ',settings:'設定・同期'};
 
 function nav(page) {
   curPage = page;
@@ -1593,7 +1578,7 @@ function changeMonth(v) {
   }
   showToast('📅 '+v.split('/')[0]+'年'+parseInt(v.split('/')[1])+'月 のデータを表示');
   // 各ページを再描画
-  if(curPage==='dash')    renderDash?.();
+  if(curPage==='monthly') renderMonthly?.();
   if(curPage==='sales')   renderSales();
   if(curPage==='freee')   renderFreeeResult();
   loadShohizeiInput();
@@ -2297,17 +2282,26 @@ function renderMonthly() {
     null,
     {l:'消耗品',          v:yen(cost_shomou), bold:false, sub:true},
     null,
-    {l:'原価合計（食材+包材）', v:yen(cost_food+cost_pack) + '　' + pct(cost_food+cost_pack), bold:true, accent:true},
-    {l:'  うち食材のみ',       v:pct(cost_food), bold:false, sub:true},
+    {l:'原価合計（食材+包材）', v:yen(cost_food+cost_pack) + '  ' + pct(cost_food+cost_pack), bold:true, accent:true},
+    {l:'  うち食材のみ原価率',  v:pct(cost_food), bold:false, sub:true},
     null,
     {l:'粗利益',          v:yen(grossProfit), bold:true, accent:true},
   ];
   // KPI row（cost_all定義後に配置）
+  const kyakutanka = (ar && ar.reduce((s,d)=>s+d.customers,0) > 0)
+    ? Math.round(totalSales / ar.reduce((s,d)=>s+d.customers,0)) : 0;
+  const tenokoriRate = totalSales > 0
+    ? ((totalSales - fixedTotal) / totalSales * 100).toFixed(1) + '%' : '-';
+  const jinkenhi = fixedCosts.filter(r =>
+    r.name.includes('給与') || r.name.includes('専従者') || r.name.includes('賃金')
+  ).reduce((s,r) => s+r.amount, 0);
+  const rodoSeisansei = jinkenhi > 0 ? Math.round(taxExcl / jinkenhi * 100) / 100 : 0;
+
   document.getElementById('monthlyKpi').innerHTML = [
-    {l:'税込売上',   v:yen(totalSales),  cls:'k-green', sub: ar?'Airレジ実データ':'推定値'},
-    {l:'原価合計',   v:yen(cost_all),    cls:'k-red',   sub:'食材'+pct(cost_food)+'　食材+包材'+pct(cost_food+cost_pack)},
-    {l:'粗利益',     v:yen(grossProfit), cls:'k-blue',  sub:'売上−原価'},
-    {l:'今月の支出', v:yen(fixedTotal),  cls:'k-yellow',sub:'キャッシュフロー'},
+    {l:'税込売上',   v:yen(totalSales),   cls:'k-green',  sub: ar?'Airレジ実データ':'推定値'},
+    {l:'原価合計',   v:yen(cost_all),     cls:'k-red',    sub:'食材'+pct(cost_food)+'　食材+包材'+pct(cost_food+cost_pack)},
+    {l:'客単価',     v:yen(kyakutanka),   cls:'k-blue',   sub: ar?'税込売上÷客数':'Airレジデータなし'},
+    {l:'手残り率',   v:tenokoriRate,      cls:'k-yellow', sub:'手残り÷税込売上'},
   ].map(k=>`<div class="kpi ${k.cls}" style="grid-column:auto"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
   document.getElementById('monthlyLeftRows').innerHTML = leftItems.map(r => {
@@ -2323,6 +2317,50 @@ function renderMonthly() {
 
   // 手残り・税計算表示
   updateTaxDisplay(teNokori, shohizei, shotokuTax, jissitsu);
+
+  // ── 月次推移グラフ ──
+  const monthlyHist = loadLS('ls_monthly_history', []);
+  const histMap = {};
+  monthlyHist.forEach(h => { histMap[h.month] = h; });
+  const now2 = new Date();
+  const recentMonths = [];
+  for(let i=5;i>=0;i--) {
+    const d2 = new Date(now2.getFullYear(), now2.getMonth()-i, 1);
+    recentMonths.push(`${d2.getFullYear()}/${String(d2.getMonth()+1).padStart(2,'0')}`);
+  }
+  const dynHist = recentMonths.filter(m => histMap[m]).map(m => ({
+    m: parseInt(m.split('/')[1])+'月',
+    s: histMap[m].totalSales || 0,
+    c: histMap[m].rawCost    || 0,
+    p: histMap[m].grossProfit|| 0,
+  }));
+  const trendEl = document.getElementById('trendBars');
+  if(trendEl) {
+    if(dynHist.length === 0) {
+      trendEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:20px;text-align:center">月次データがまだありません<br><small>月末に「今月分を記録する」を押すと表示されます</small></div>';
+    } else {
+      const maxS = Math.max(...dynHist.map(d=>d.s), 1);
+      trendEl.innerHTML = dynHist.map(d=>`
+        <div class="t-grp">
+          <div class="t-inner">
+            <div class="t-bar bs" style="height:${Math.max(0,d.s)/maxS*62}px" title="${yen(d.s)}"></div>
+            <div class="t-bar bc" style="height:${Math.max(0,d.c)/maxS*62}px" title="${yen(d.c)}"></div>
+            <div class="t-bar bp" style="height:${Math.max(0,d.p)/maxS*62}px" title="${yen(d.p)}"></div>
+          </div>
+          <div class="t-lbl">${d.m}</div>
+        </div>`).join('');
+    }
+  }
+
+  // ── 棚卸サマリ ──
+  const tanaSnap = document.getElementById('tanaSnapshot');
+  if(tanaSnap) {
+    const totals2 = SHEETS.map((sh,i)=>({name:sh.name,total:calcSheetTotal(i)}));
+    tanaSnap.innerHTML =
+      `<div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--accent2);margin-bottom:10px">${yen(tanaTotal)}</div>`+
+      totals2.map(t=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--text2)">${t.name}</span><span style="font-family:'DM Mono',monospace">${yen(t.total)}</span></div>`).join('')+
+      `<div style="text-align:right;margin-top:8px"><span onclick="nav('tana')" style="font-size:11px;color:var(--accent);cursor:pointer;font-family:'DM Mono',monospace">棚卸入力へ →</span></div>`;
+  }
 }
 
 function updateTaxDisplay(teNokori, shohizei, shotokuTax, jissitsu) {
