@@ -902,23 +902,40 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
 
 <!-- ═══════════ freee連携 ═══════════ -->
 <div class="page" id="page-freee">
-  <div class="sec-title">freee CSV 取込 <span class="s-badge">AI自動仕分け</span></div>
-  <div class="upload-zone" style="margin-bottom:14px" onclick="simulateFreee()">
+  <div class="sec-title">freee 支出CSV 取込 <span class="s-badge">キャッシュフロー確認</span></div>
+  <div class="info-banner banner-yellow">💡 freee → 取引 → 取引の一覧・登録 → エクスポート（CSV）からダウンロードしてください</div>
+  <div class="csv-upload" id="freeeZone" style="margin-bottom:16px">
+    <input type="file" accept=".csv" id="freeeInput" onchange="handleFreeeFile(this)">
     <div class="upload-icon">⇅</div>
-    <div class="upload-title">freee CSVをここにドロップ</div>
-    <div class="upload-sub">または クリックしてデモを実行する</div>
+    <div class="upload-title">freee CSV をドロップ</div>
+    <div class="upload-sub">または <span style="color:var(--blue);font-weight:500">クリックしてファイルを選択</span></div>
   </div>
-  <div class="ai-classify" id="freeeResult" style="display:none">
-    <div class="ai-hdr">
-      <div style="font-size:13px;color:#5a3a8a;font-weight:500">AI 自動仕分け結果</div>
-      <div class="ai-badge">Claude AI</div>
-      <div style="margin-left:auto;font-size:11px;color:var(--text3)" id="freeeCount"></div>
+  <div id="freeeResult" style="display:none">
+    <div class="info-banner banner-green" id="freeeBanner"></div>
+    <!-- KPI -->
+    <div class="kpi-mini-row" id="freeeKpi" style="margin-bottom:14px"></div>
+    <!-- 勘定科目別集計 -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">勘定科目別 支出</div>
+      <div id="freeeByCategory"></div>
     </div>
-    <div class="ai-row ai-hdr-row"><div>摘要</div><div style="text-align:right">金額</div><div>AI判定</div><div style="text-align:right">信頼度</div></div>
-    <div id="freeeRows"></div>
-    <div style="padding:12px 18px;display:flex;gap:8px;border-top:1px solid var(--border)">
-      <button class="btn btn-primary" onclick="applyFreee()">集計シートに反映する</button>
-      <button class="btn btn-sec">仕分けを修正する</button>
+    <!-- 明細テーブル -->
+    <div class="card">
+      <div class="card-title" style="display:flex;align-items:center;gap:8px">
+        支出明細
+        <select id="freeeCatFilter" onchange="renderFreeeTable()" style="font-size:11px;padding:2px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg2)">
+          <option value="">すべて</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="edit-table" style="width:100%">
+          <thead><tr><th>発生日</th><th>取引先</th><th>勘定科目</th><th>備考</th><th style="text-align:right">金額</th></tr></thead>
+          <tbody id="freeeTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn btn-sec" onclick="document.getElementById('freeeInput').value='';document.getElementById('freeeResult').style.display='none'">別のCSVを読み込む</button>
     </div>
   </div>
 </div>
@@ -2749,7 +2766,7 @@ function handleAiregiFile(input) {
 
 function parseAiregiCSV(text) {
   text = text.replace(/^\uFEFF/, '');
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim());
   if(lines.length < 2) { showToast('CSVデータが空です'); return; }
   const header = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
   console.log('AirレジCSVヘッダー:', header);
@@ -2841,6 +2858,120 @@ function parseAiregiCSV(text) {
   showToast('✓ ' + salesData.length + '日分の売上データを取り込みました');
   renderSales();
   nav('sales');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// FREEE CSV
+// ════════════════════════════════════════════════════════════════════════
+
+let freeeData = [];
+
+function handleFreeeFile(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    if(text.includes('�')) {
+      const r2 = new FileReader();
+      r2.onload = e2 => parseFreeeCSV(e2.target.result);
+      r2.readAsText(file, 'CP932');
+    } else {
+      parseFreeeCSV(text);
+    }
+  };
+  reader.readAsText(file, 'CP932');
+}
+
+function parseFreeeCSV(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const lines = text.split('\n').filter(l => l.trim());
+  if(lines.length < 2) { showToast('CSVデータが空です'); return; }
+  const header = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
+  const rows = lines.slice(1).map(l => {
+    const cols = l.split(',').map(c => c.replace(/"/g,'').trim());
+    const obj = {};
+    header.forEach((h,i) => obj[h] = cols[i] || '');
+    return obj;
+  });
+  // 支出のみ抽出（事業主貸・長期借入金は除外）
+  const EXCLUDE_CATS = ['事業主貸', '長期借入金', '元入金'];
+  const expenses = rows.filter(r =>
+    r['収支区分'] === '支出' &&
+    r['金額'] &&
+    !EXCLUDE_CATS.includes(r['勘定科目'])
+  ).map(r => ({
+    date:    r['発生日'] || '',
+    vendor:  r['取引先'] || '',
+    cat:     r['勘定科目'] || '',
+    memo:    r['備考'] || r['品目'] || '',
+    amount:  parseInt((r['金額']||'0').replace(/[,，]/g,'')) || 0,
+    account: r['支払口座'] || '',
+  }));
+
+  if(expenses.length === 0) { showToast('支出データが見つかりません'); return; }
+  freeeData = expenses;
+  renderFreeeResult();
+}
+
+function renderFreeeResult() {
+  const data = freeeData;
+  const total = data.reduce((s,r) => s+r.amount, 0);
+
+  // バナー
+  const dates = data.map(r=>r.date).filter(Boolean).sort();
+  document.getElementById('freeeBanner').textContent =
+    `✅ ${data.length}件の支出を読み込みました（${dates[0]}〜${dates[dates.length-1]}）`;
+
+  // KPI
+  const byAccount = {};
+  data.forEach(r => { byAccount[r.account||'不明'] = (byAccount[r.account||'不明']||0) + r.amount; });
+  document.getElementById('freeeKpi').innerHTML =
+    `<div class="kmi"><div class="kmi-l">支出合計</div><div class="kmi-v">${yen(total)}</div></div>` +
+    Object.entries(byAccount).map(([k,v]) =>
+      `<div class="kmi"><div class="kmi-l">${k}</div><div class="kmi-v">${yen(v)}</div></div>`
+    ).join('');
+
+  // 勘定科目別集計
+  const byCat = {};
+  data.forEach(r => { byCat[r.cat] = (byCat[r.cat]||0) + r.amount; });
+  const sortedCats = Object.entries(byCat).sort((a,b) => b[1]-a[1]);
+  document.getElementById('freeeByCategory').innerHTML = sortedCats.map(([cat, amt]) => {
+    const pct = Math.round(amt/total*100);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+      <div style="width:90px;font-size:12px;color:var(--text2);flex-shrink:0">${cat}</div>
+      <div style="flex:1;background:var(--bg3);border-radius:4px;height:8px">
+        <div style="width:${pct}%;background:var(--accent2);height:8px;border-radius:4px"></div>
+      </div>
+      <div style="width:70px;text-align:right;font-size:12px;font-family:'DM Mono',monospace">${yen(amt)}</div>
+      <div style="width:32px;text-align:right;font-size:10px;color:var(--text3)">${pct}%</div>
+    </div>`;
+  }).join('');
+
+  // フィルタ選択肢
+  const sel = document.getElementById('freeeCatFilter');
+  sel.innerHTML = '<option value="">すべて</option>' +
+    sortedCats.map(([cat]) => `<option value="${cat}">${cat}</option>`).join('');
+
+  document.getElementById('freeeResult').style.display = 'block';
+  renderFreeeTable();
+}
+
+function renderFreeeTable() {
+  const filterCat = document.getElementById('freeeCatFilter')?.value || '';
+  const rows = filterCat ? freeeData.filter(r => r.cat === filterCat) : freeeData;
+  const subtotal = rows.reduce((s,r) => s+r.amount, 0);
+  document.getElementById('freeeTableBody').innerHTML =
+    rows.map(r => `<tr>
+      <td style="font-size:11px;color:var(--text3);white-space:nowrap">${r.date}</td>
+      <td style="font-size:11px">${r.vendor||'-'}</td>
+      <td><span class="tag t-fixed" style="font-size:10px">${r.cat}</span></td>
+      <td style="font-size:11px;color:var(--text3)">${r.memo||'-'}</td>
+      <td style="text-align:right;font-family:'DM Mono',monospace;font-size:12px;font-weight:500">${yen(r.amount)}</td>
+    </tr>`).join('') +
+    `<tr style="border-top:2px solid var(--border);background:var(--bg2)">
+      <td colspan="4" style="font-weight:700;font-size:12px">合計 ${rows.length}件</td>
+      <td style="text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:var(--accent2)">${yen(subtotal)}</td>
+    </tr>`;
 }
 
 // ════════════════════════════════════════════════════════════════════════
