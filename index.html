@@ -2870,16 +2870,19 @@ function handleFreeeFile(input) {
   const file = input.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    const text = e.target.result;
-    if(text.includes('�')) {
-      const r2 = new FileReader();
-      r2.onload = e2 => parseFreeeCSV(e2.target.result);
-      r2.readAsText(file, 'CP932');
-    } else {
-      parseFreeeCSV(text);
+    const buf = e.target.result;
+    const encodings = ['utf-8', 'shift-jis'];
+    let text = null;
+    for(const enc of encodings) {
+      try {
+        const decoded = new TextDecoder(enc, {fatal: true}).decode(buf);
+        if(!decoded.includes('\uFFFD')) { text = decoded; break; }
+      } catch(e) {}
     }
+    if(!text) text = new TextDecoder('shift-jis').decode(buf);
+    parseFreeeCSV(text);
   };
-  reader.readAsText(file, 'CP932');
+  reader.readAsArrayBuffer(file);
 }
 
 function parseFreeeCSV(text) {
