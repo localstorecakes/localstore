@@ -921,20 +921,27 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
     </div>
     <!-- 明細テーブル -->
     <div class="card">
-      <div class="card-title" style="display:flex;align-items:center;gap:8px">
+      <div class="card-title" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         支出明細
         <select id="freeeCatFilter" onchange="renderFreeeTable()" style="font-size:11px;padding:2px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg2)">
-          <option value="">すべて</option>
+          <option value="">すべて（勘定科目）</option>
+        </select>
+        <select id="freeeTypeFilter" onchange="renderFreeeTable()" style="font-size:11px;padding:2px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg2)">
+          <option value="">すべて（分類）</option>
+          <option value="固定費">固定費</option>
+          <option value="変動費">変動費</option>
+          <option value="その他">その他</option>
+          <option value="除外">除外</option>
         </select>
       </div>
       <div style="overflow-x:auto">
         <table class="edit-table" style="width:100%">
-          <thead><tr><th>発生日</th><th>取引先</th><th>勘定科目</th><th>備考</th><th style="text-align:right">金額</th></tr></thead>
+          <thead><tr><th>日付</th><th>勘定科目/備考</th><th>分類</th><th style="text-align:right">金額</th><th style="width:28px"></th></tr></thead>
           <tbody id="freeeTableBody"></tbody>
         </table>
       </div>
     </div>
-    <div style="margin-top:12px">
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-sec" onclick="document.getElementById('freeeInput').value='';document.getElementById('freeeResult').style.display='none'">別のCSVを読み込む</button>
     </div>
   </div>
@@ -1569,6 +1576,7 @@ function changeMonth(v) {
   shiireData = loadLS(shiireKey(v), []);
   airegiData = loadLS(airegiKey(v), null);
   fixedCosts = loadLS(fixedKey(v), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
+  freeeData  = JSON.parse(localStorage.getItem(freeeKey(v)) || '[]');
   // 右上バッジを更新
   const badge = document.getElementById('tbBadge');
   if(badge && v) {
@@ -1579,6 +1587,7 @@ function changeMonth(v) {
   // 各ページを再描画
   if(curPage==='dash')    renderDash?.();
   if(curPage==='sales')   renderSales();
+  if(curPage==='freee')   renderFreeeResult();
   if(curPage==='shiire')  renderShiire();
   if(curPage==='tana')    renderTana();
   if(curPage==='monthly') renderMonthly?.();
@@ -2190,9 +2199,14 @@ function renderMonthly() {
   shiireData = loadLS(shiireKey(), []);
   airegiData = loadLS(airegiKey(), null);
   fixedCosts = loadLS(fixedKey(), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
+  freeeData  = JSON.parse(localStorage.getItem(freeeKey()) || '[]');
   document.getElementById('monthlyBadge').textContent = document.getElementById('monthSel').value;
   const tanaTotal   = calcGrandTotal();
   const shiireTotal = shiireData.reduce((s,r) => s+r.amount, 0);
+  freeeData.forEach(r => { if(!r.type) r.type = freeeDefaultType(r.cat); });
+  const freeeTotal  = freeeData.filter(r=>r.type!=='除外').reduce((s,r) => s+r.amount, 0);
+  const freeeFixed  = freeeData.filter(r=>r.type==='固定費').reduce((s,r) => s+r.amount, 0);
+  const freeeVar    = freeeData.filter(r=>r.type==='変動費').reduce((s,r) => s+r.amount, 0);
   const ar          = airegiData;
   const totalSales  = (ar && ar.length>0) ? ar.reduce((s,d) => s+d.sales, 0) : 0;
   const prevTotal   = calcPrevTotal();
@@ -2225,6 +2239,13 @@ function renderMonthly() {
     {l:'原価合計',    v:yen(rawCost),                      bold:true},
     null,
     {l:'粗利益',      v:yen(grossProfit),                  bold:true, accent:true},
+    null,
+    ...(freeeTotal>0 ? [
+      {l:'freee固定費',  v:yen(freeFixed),  bold:false, sub:true},
+      {l:'freee変動費',  v:yen(freeeVar),    bold:false, sub:true},
+      {l:'freee支出合計',v:yen(freeeTotal),  bold:false},
+    ] : []),
+    {l:'手残り概算',    v:yen(grossProfit - fixedTotal - freeeTotal), bold:true, accent: grossProfit - fixedTotal - freeeTotal >= 0},
   ];
   document.getElementById('monthlyLeftRows').innerHTML = leftItems.map(r => {
     if(!r) return '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">';
@@ -2865,6 +2886,7 @@ function parseAiregiCSV(text) {
 // ════════════════════════════════════════════════════════════════════════
 
 let freeeData = [];
+function freeeKey(m) { const mo = (m||document.getElementById('monthSel')?.value||'').replace('/','-'); return 'ls_freee_' + mo; }
 
 function handleFreeeFile(input) {
   const file = input.files[0]; if(!file) return;
@@ -2912,12 +2934,41 @@ function parseFreeeCSV(text) {
   }));
 
   if(expenses.length === 0) { showToast('支出データが見つかりません'); return; }
+
+  // CSVの日付から月を自動判定して正しいキーに保存
+  const firstDate = expenses.find(r=>r.date)?.date || '';
+  const dm = firstDate.match(/(\d{4})[\/-](\d{2})/);
+  let csvMonth = document.getElementById('monthSel')?.value || '';
+  if(dm) {
+    csvMonth = dm[1] + '/' + dm[2];
+    // 月セレクタを合わせる
+    const sel = document.getElementById('monthSel');
+    if(sel) {
+      let opt = Array.from(sel.options).find(o => o.value === csvMonth);
+      if(!opt) {
+        opt = document.createElement('option');
+        opt.value = csvMonth;
+        opt.textContent = dm[1] + '年' + parseInt(dm[2]) + '月';
+        sel.insertBefore(opt, sel.options[0]);
+      }
+      sel.value = csvMonth;
+    }
+  }
   freeeData = expenses;
+  localStorage.setItem(freeeKey(csvMonth), JSON.stringify(expenses));
+  showToast('✓ ' + expenses.length + '件の支出データを' + csvMonth + 'に保存しました');
   renderFreeeResult();
 }
 
 function renderFreeeResult() {
+  // 現在月のfreeeデータを読み込む
+  const saved = localStorage.getItem(freeeKey());
+  if(saved) freeeData = JSON.parse(saved);
   const data = freeeData;
+  if(!data || data.length === 0) {
+    document.getElementById('freeeResult').style.display = 'none';
+    return;
+  }
   const total = data.reduce((s,r) => s+r.amount, 0);
 
   // バナー
@@ -2950,30 +3001,103 @@ function renderFreeeResult() {
     </div>`;
   }).join('');
 
+  // typeが未設定の場合はデフォルトで補完
+  data.forEach(r => { if(!r.type) r.type = freeeDefaultType(r.cat); });
+
+  // 分類別集計KPI
+  const byType = {固定費:0, 変動費:0, その他:0};
+  data.filter(r=>r.type!=='除外').forEach(r => { if(byType[r.type]!==undefined) byType[r.type]+=r.amount; });
+  document.getElementById('freeeKpi').innerHTML =
+    `<div class="kmi"><div class="kmi-l">支出合計</div><div class="kmi-v">${yen(total)}</div></div>` +
+    Object.entries(byType).map(([k,v]) =>
+      `<div class="kmi"><div class="kmi-l" style="color:${freeeTypeColor(k)}">${k}</div><div class="kmi-v">${yen(v)}</div></div>`
+    ).join('');
+
   // フィルタ選択肢
   const sel = document.getElementById('freeeCatFilter');
-  sel.innerHTML = '<option value="">すべて</option>' +
+  sel.innerHTML = '<option value="">すべて（勘定科目）</option>' +
     sortedCats.map(([cat]) => `<option value="${cat}">${cat}</option>`).join('');
 
   document.getElementById('freeeResult').style.display = 'block';
   renderFreeeTable();
 }
 
+
+// 勘定科目→支出分類のデフォルトマッピング
+const FREEE_TYPE_MAP = {
+  '地代家賃': '固定費', '賃借料': '固定費', 'リース料': '固定費',
+  '専従者給与': '固定費', '給与賃金': '固定費',
+  '通信費': '固定費', '水道光熱費': '固定費',
+  '支払手数料': '変動費', '仕入高': '変動費', '消耗品費': '変動費',
+  '交際費': '変動費', '広告宣伝費': '変動費',
+  '長期借入金': '除外', '事業主貸': '除外',
+};
+function freeeDefaultType(cat) {
+  return FREEE_TYPE_MAP[cat] || 'その他';
+}
+
+function freeeTypeColor(t) {
+  return {固定費:'var(--blue)',変動費:'var(--accent2)',その他:'var(--text3)',除外:'#ccc'}[t]||'var(--text3)';
+}
+
+function saveFreeeData() {
+  localStorage.setItem(freeeKey(), JSON.stringify(freeeData));
+}
+
+function updateFreeeType(idx, val) {
+  freeeData[idx].type = val;
+  saveFreeeData();
+  renderFreeeResult();
+}
+
+function updateFreeeAmount(idx, val) {
+  freeeData[idx].amount = parseInt(val.replace(/[^0-9]/g,''))||0;
+  saveFreeeData();
+  renderFreeeResult();
+}
+
+function deleteFreeeRow(idx) {
+  freeeData.splice(idx, 1);
+  saveFreeeData();
+  renderFreeeResult();
+}
+
 function renderFreeeTable() {
-  const filterCat = document.getElementById('freeeCatFilter')?.value || '';
-  const rows = filterCat ? freeeData.filter(r => r.cat === filterCat) : freeeData;
-  const subtotal = rows.reduce((s,r) => s+r.amount, 0);
+  const filterCat  = document.getElementById('freeeCatFilter')?.value  || '';
+  const filterType = document.getElementById('freeeTypeFilter')?.value || '';
+  // typeが未設定の場合はデフォルトで補完
+  freeeData.forEach(r => { if(!r.type) r.type = freeeDefaultType(r.cat); });
+  const allRows = freeeData.map((r,i) => ({...r, _idx:i}));
+  const rows = allRows
+    .filter(r => !filterCat  || r.cat  === filterCat)
+    .filter(r => !filterType || r.type === filterType);
+  const subtotal = rows.filter(r=>r.type!=='除外').reduce((s,r) => s+r.amount, 0);
   document.getElementById('freeeTableBody').innerHTML =
-    rows.map(r => `<tr>
-      <td style="font-size:11px;color:var(--text3);white-space:nowrap">${r.date}</td>
-      <td style="font-size:11px">${r.vendor||'-'}</td>
-      <td><span class="tag t-fixed" style="font-size:10px">${r.cat}</span></td>
-      <td style="font-size:11px;color:var(--text3)">${r.memo||'-'}</td>
-      <td style="text-align:right;font-family:'DM Mono',monospace;font-size:12px;font-weight:500">${yen(r.amount)}</td>
+    rows.map(r => `<tr style="${r.type==='除外'?'opacity:0.4':''}">
+      <td style="font-size:11px;color:var(--text3);white-space:nowrap">${r.date}<br><span style="color:var(--text3)">${r.vendor||''}</span></td>
+      <td style="font-size:11px">
+        <span class="tag t-fixed" style="font-size:10px;margin-bottom:2px">${r.cat}</span><br>
+        <span style="color:var(--text3);font-size:10px">${r.memo||''}</span>
+      </td>
+      <td>
+        <select onchange="updateFreeeType(${r._idx},this.value)"
+          style="font-size:11px;padding:2px 4px;border-radius:5px;border:1px solid var(--border);background:var(--bg2);color:${freeeTypeColor(r.type)}">
+          ${['固定費','変動費','その他','除外'].map(t=>`<option value="${t}" ${r.type===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </td>
+      <td style="text-align:right">
+        <input class="ei" type="number" value="${r.amount}"
+          onchange="updateFreeeAmount(${r._idx},this.value)"
+          style="width:80px;text-align:right;font-size:12px;font-family:'DM Mono',monospace">
+      </td>
+      <td style="text-align:center">
+        <button onclick="deleteFreeeRow(${r._idx})" style="background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer">×</button>
+      </td>
     </tr>`).join('') +
     `<tr style="border-top:2px solid var(--border);background:var(--bg2)">
-      <td colspan="4" style="font-weight:700;font-size:12px">合計 ${rows.length}件</td>
+      <td colspan="3" style="font-weight:700;font-size:12px">除外以外の合計 ${rows.filter(r=>r.type!=='除外').length}件</td>
       <td style="text-align:right;font-family:'DM Mono',monospace;font-weight:700;color:var(--accent2)">${yen(subtotal)}</td>
+      <td></td>
     </tr>`;
 }
 
