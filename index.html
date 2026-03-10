@@ -613,9 +613,14 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
         <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(212,207,195,.4)">
           <div>
             <span style="font-size:12px;color:var(--text2)">消費税貯金</span>
-            <span style="font-size:10px;color:var(--text3);margin-left:6px">税込売上÷11（概算）</span>
+            <span style="font-size:10px;color:var(--text3);margin-left:6px">手動入力</span>
           </div>
-          <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--red)" id="monthlyShohizei">-</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span style="font-size:11px;color:var(--text3)">¥</span>
+            <input type="number" id="shohizeiInput"
+              onchange="saveShohizeiInput(this.value);onTaxRateChange()"
+              style="width:90px;text-align:right;font-size:12px;font-family:'DM Mono',monospace;color:var(--red);border:1px solid var(--border);border-radius:6px;padding:3px 6px;background:var(--bg2)">
+          </div>
         </div>
         <!-- 所得税概算 -->
         <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(212,207,195,.4)">
@@ -1591,6 +1596,7 @@ function changeMonth(v) {
   if(curPage==='dash')    renderDash?.();
   if(curPage==='sales')   renderSales();
   if(curPage==='freee')   renderFreeeResult();
+  loadShohizeiInput();
   if(curPage==='shiire')  renderShiire();
   if(curPage==='tana')    renderTana();
   if(curPage==='monthly') renderMonthly?.();
@@ -2219,7 +2225,7 @@ function renderMonthly() {
   // 手残り = 税込売上 - 今月の支出
   const teNokori    = totalSales - fixedTotal;
   // 消費税貯金 = Airレジ税込売上 ÷ 11
-  const shohizei    = Math.round(totalSales / 11);
+  const shohizei    = loadShohizeiInput();
   const savedRate = localStorage.getItem('ls_tax_rate') || '0.20';
   const taxSel = document.getElementById('taxRateSel');
   if(taxSel && taxSel.value !== savedRate) taxSel.value = savedRate;
@@ -2230,29 +2236,85 @@ function renderMonthly() {
   // KPI row
   document.getElementById('monthlyKpi').innerHTML = [
     {l:'税込売上',  v:yen(totalSales),   cls:'k-green', sub: ar?'Airレジ実データ':'推定値'},
-    {l:'原価合計',  v:yen(rawCost),      cls:'k-red',   sub:'期首+仕入−期末'},
+    {l:'原価合計',  v:yen(cost_all) + ' (' + pct(cost_food+cost_pack) + ')', cls:'k-red', sub:'食材+包材原価率'},
     {l:'粗利益',    v:yen(grossProfit),  cls:'k-blue',  sub:'売上−原価'},
     {l:'今月の支出', v:yen(fixedTotal),   cls:'k-yellow',sub:'キャッシュフロー'},
   ].map(k=>`<div class="kpi ${k.cls}" style="grid-column:auto"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
+  // 仕入を業者・分類で分解
+  // 食材：だるまや・ヒラタ食材（cat=食材）
+  // 包材：ヒラタ包材・cat=包材
+  // 消耗品：cat=道具 or vendor含む消耗品
+  const shiire_food = shiireData.filter(r =>
+    r.cat === '食材' || r.vendor === 'だるまや' || r.vendor === 'ヒラタ食材'
+  ).reduce((s,r) => s+r.amount, 0);
+  const shiire_pack = shiireData.filter(r =>
+    (r.cat === '包材' || r.vendor === 'ヒラタ包材') && r.cat !== '道具'
+  ).reduce((s,r) => s+r.amount, 0);
+  const shiire_shomou = shiireData.filter(r =>
+    r.cat === '道具' || r.vendor === 'モノタロウ' || r.vendor === 'テクモア'
+  ).reduce((s,r) => s+r.amount, 0);
+
+  // 棚卸を食材・包材・消耗品シートで分解
+  const calcSheetTotalById = (sheetId) => {
+    const sh = SHEETS.find(s => s.id === sheetId); if(!sh) return 0;
+    return sh.items.reduce((s,item) => {
+      const st = stocks[item.id];
+      return s + (st && st.stock !== undefined ? calcItemAmount(item, st.stock) : 0);
+    }, 0);
+  };
+  const calcPrevBySheetId = (sheetId) => {
+    const sh = SHEETS.find(s => s.id === sheetId); if(!sh) return 0;
+    return sh.items.reduce((s,item) => {
+      const st = stocks[item.id];
+      return s + (st && st.prevStock !== undefined ? calcItemAmount(item, st.prevStock) : 0);
+    }, 0);
+  };
+  const tana_food  = calcSheetTotalById('darumaya') + calcSheetTotalById('hirata_food');
+  const tana_pack  = calcSheetTotalById('hozai');
+  const tana_shomou= calcSheetTotalById('shomou');
+  const prev_food  = calcPrevBySheetId('darumaya') + calcPrevBySheetId('hirata_food');
+  const prev_pack  = calcPrevBySheetId('hozai');
+  const prev_shomou= calcPrevBySheetId('shomou');
+
+  // 原価 = 期首 + 仕入 - 期末（カテゴリ別）
+  const cost_food   = prev_food   + shiire_food   - tana_food;
+  const cost_pack   = prev_pack   + shiire_pack   - tana_pack;
+  const cost_shomou = prev_shomou + shiire_shomou - tana_shomou;
+  const cost_all    = cost_food + cost_pack + cost_shomou;
+
+  // 原価率（税抜売上基準）
+  const taxExcl = totalSales > 0 ? Math.round(totalSales / 1.1) : 0;
+  const pct = (v) => taxExcl > 0 ? (v / taxExcl * 100).toFixed(1) + '%' : '-';
+
   // Left: 売上・原価 (auto)
   const leftItems = [
-    {l:'税込売上',    v:yen(totalSales),                   bold:false},
-    {l:'（消費税）',  v:yen(Math.round(totalSales/11)),    bold:false, sub:true},
-    {l:'税抜売上',    v:yen(Math.round(totalSales/1.1)),   bold:false},
+    {l:'税込売上',    v:yen(totalSales),    bold:false},
+    {l:'（消費税貯金）',v:yen(shohizei),    bold:false, sub:true, red:true},
+    {l:'税抜売上',    v:yen(taxExcl),       bold:false},
     null,
-    {l:'期首在庫',    v:yen(prevTotal),                    bold:false},
-    {l:'当月仕入合計',v:yen(shiireTotal),                  bold:false},
-    {l:'期末在庫',    v:yen(tanaTotal),                    bold:false},
-    {l:'原価合計',    v:yen(rawCost),                      bold:true},
+    {l:'期首在庫（食材）', v:yen(prev_food),  bold:false, sub:true},
+    {l:'当月仕入（食材）', v:yen(shiire_food),bold:false, sub:true},
+    {l:'期末在庫（食材）', v:yen(tana_food),  bold:false, sub:true},
+    {l:'食材原価',        v:yen(cost_food) + '　' + pct(cost_food), bold:true},
     null,
-    {l:'粗利益',      v:yen(grossProfit),                  bold:true, accent:true},
+    {l:'期首在庫（包材）', v:yen(prev_pack),  bold:false, sub:true},
+    {l:'当月仕入（包材）', v:yen(shiire_pack),bold:false, sub:true},
+    {l:'期末在庫（包材）', v:yen(tana_pack),  bold:false, sub:true},
+    {l:'包材原価',        v:yen(cost_pack) + '　' + pct(cost_pack), bold:true},
+    null,
+    {l:'消耗品',          v:yen(cost_shomou), bold:false, sub:true},
+    null,
+    {l:'原価合計（食材+包材）', v:yen(cost_food+cost_pack) + '　' + pct(cost_food+cost_pack), bold:true, accent:true},
+    {l:'  うち食材のみ',       v:pct(cost_food), bold:false, sub:true},
+    null,
+    {l:'粗利益',          v:yen(grossProfit), bold:true, accent:true},
   ];
   document.getElementById('monthlyLeftRows').innerHTML = leftItems.map(r => {
     if(!r) return '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">';
-    return `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(212,207,195,.4);font-size:12px;${r.bold?'font-weight:700':''}">
+    return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(212,207,195,.4);font-size:12px;${r.bold?'font-weight:700':''}">
       <span style="color:${r.sub?'var(--text3)':'var(--text2)'}">${r.l}</span>
-      <span style="font-family:'DM Mono',monospace;color:${r.accent?'var(--accent2)':''}">${r.v}</span>
+      <span style="font-family:'DM Mono',monospace;color:${r.red?'var(--red)':r.accent?'var(--accent2)':'var(--text)'}">${r.v}</span>
     </div>`;
   }).join('');
 
@@ -2277,6 +2339,19 @@ function updateTaxDisplay(teNokori, shohizei, shotokuTax, jissitsu) {
   if(ji) { ji.textContent = yen(jissitsu); ji.style.color = jissitsu>=0?'var(--accent2)':'var(--red)'; }
 }
 
+function saveShohizeiInput(val) {
+  const v = parseInt(val) || 0;
+  const key = 'ls_shohizei_' + (document.getElementById('monthSel')?.value||'').replace('/','-');
+  localStorage.setItem(key, v);
+}
+function loadShohizeiInput() {
+  const key = 'ls_shohizei_' + (document.getElementById('monthSel')?.value||'').replace('/','-');
+  const v = parseInt(localStorage.getItem(key)) || 0;
+  const el = document.getElementById('shohizeiInput');
+  if(el) el.value = v;
+  return v;
+}
+
 function onTaxRateChange() {
   const sel = document.getElementById('taxRateSel');
   const v = sel ? sel.value : '0.20';
@@ -2286,7 +2361,7 @@ function onTaxRateChange() {
   const totalSales = ar ? ar.reduce((s,d)=>s+d.sales,0) : 0;
   const fixedTotal = fixedCosts.reduce((s,r)=>s+r.amount,0);
   const teNokori   = totalSales - fixedTotal;
-  const shohizei   = Math.round(totalSales / 11);
+  const shohizei   = loadShohizeiInput();
   const taxRate    = parseFloat(v);
   const shotokuTax = Math.round(Math.max(0, teNokori) * taxRate);
   const jissitsu   = teNokori - shohizei - shotokuTax;
@@ -2312,7 +2387,7 @@ function renderFixedCostRows() {
   const ar2 = airegiData;
   const totalSales2 = ar2 ? ar2.reduce((s,d)=>s+d.sales,0) : 0;
   const teNokori2   = totalSales2 - fixedTotal;
-  const shohizei2   = Math.round(totalSales2 / 11);
+  const shohizei2   = loadShohizeiInput();
   const taxRate2    = parseFloat(localStorage.getItem('ls_tax_rate') || '0.20');
   const shotokuTax2 = Math.round(Math.max(0, teNokori2) * taxRate2);
   const jissitsu2   = teNokori2 - shohizei2 - shotokuTax2;
