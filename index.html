@@ -2233,14 +2233,6 @@ function renderMonthly() {
   const shotokuTax  = Math.round(Math.max(0, teNokori) * taxRate);
   const jissitsu    = teNokori - shohizei - shotokuTax;
 
-  // KPI row
-  document.getElementById('monthlyKpi').innerHTML = [
-    {l:'税込売上',  v:yen(totalSales),   cls:'k-green', sub: ar?'Airレジ実データ':'推定値'},
-    {l:'原価合計',  v:yen(cost_all) + ' (' + pct(cost_food+cost_pack) + ')', cls:'k-red', sub:'食材+包材原価率'},
-    {l:'粗利益',    v:yen(grossProfit),  cls:'k-blue',  sub:'売上−原価'},
-    {l:'今月の支出', v:yen(fixedTotal),   cls:'k-yellow',sub:'キャッシュフロー'},
-  ].map(k=>`<div class="kpi ${k.cls}" style="grid-column:auto"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
-
   // 仕入を業者・分類で分解
   // 食材：だるまや・ヒラタ食材（cat=食材）
   // 包材：ヒラタ包材・cat=包材
@@ -2310,6 +2302,14 @@ function renderMonthly() {
     null,
     {l:'粗利益',          v:yen(grossProfit), bold:true, accent:true},
   ];
+  // KPI row（cost_all定義後に配置）
+  document.getElementById('monthlyKpi').innerHTML = [
+    {l:'税込売上',   v:yen(totalSales),  cls:'k-green', sub: ar?'Airレジ実データ':'推定値'},
+    {l:'原価合計',   v:yen(cost_all),    cls:'k-red',   sub:'食材'+pct(cost_food)+'　食材+包材'+pct(cost_food+cost_pack)},
+    {l:'粗利益',     v:yen(grossProfit), cls:'k-blue',  sub:'売上−原価'},
+    {l:'今月の支出', v:yen(fixedTotal),  cls:'k-yellow',sub:'キャッシュフロー'},
+  ].map(k=>`<div class="kpi ${k.cls}" style="grid-column:auto"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
   document.getElementById('monthlyLeftRows').innerHTML = leftItems.map(r => {
     if(!r) return '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">';
     return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(212,207,195,.4);font-size:12px;${r.bold?'font-weight:700':''}">
