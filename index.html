@@ -592,25 +592,28 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
     </div>
     <div class="card">
       <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
-        <span>固定費・販管費</span>
+        <span>今月のキャッシュフロー</span>
         <button class="btn btn-primary btn-sm" onclick="openFixedCostModal()">＋ 項目追加</button>
       </div>
       <div id="fixedCostRows"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;border-top:1px solid var(--border);margin-top:4px">
-        <span style="font-size:12px;font-weight:700;color:var(--text2)">固定費合計</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text2)">今月の支出</span>
         <span style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--accent2)" id="fixedCostTotal">¥0</span>
       </div>
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-        <!-- 手残り（税引前） -->
+        <!-- 手残り = 税込売上 - 今月の支出 -->
         <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(212,207,195,.4)">
-          <span style="font-size:12px;color:var(--text2)">手残り（税引前）</span>
+          <div>
+            <span style="font-size:12px;color:var(--text2)">手残り</span>
+            <span style="font-size:10px;color:var(--text3);margin-left:6px">税込売上 − 今月の支出</span>
+          </div>
           <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600" id="monthlyTeNokori">-</span>
         </div>
         <!-- 消費税貯金 -->
         <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(212,207,195,.4)">
           <div>
             <span style="font-size:12px;color:var(--text2)">消費税貯金</span>
-            <span style="font-size:10px;color:var(--text3);margin-left:6px">売上÷11</span>
+            <span style="font-size:10px;color:var(--text3);margin-left:6px">税込売上÷11（概算）</span>
           </div>
           <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--red)" id="monthlyShohizei">-</span>
         </div>
@@ -646,7 +649,7 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
 <div class="modal-overlay" id="fixedCostModalOverlay">
   <div class="modal">
     <div class="modal-hdr">
-      <div class="modal-title" id="fcModalTitle">固定費を追加</div>
+      <div class="modal-title" id="fcModalTitle">支出項目を追加</div>
       <button class="modal-close" onclick="closeFixedCostModal()">✕</button>
     </div>
     <div class="modal-body">
@@ -2213,9 +2216,14 @@ function renderMonthly() {
   const rawCost     = prevTotal + shiireTotal - tanaTotal; // 期首+仕入-期末
   const grossProfit = totalSales - rawCost;
   const fixedTotal  = fixedCosts.reduce((s,r) => s+r.amount, 0);
-  const teNokori    = grossProfit - fixedTotal;
+  // 手残り = 税込売上 - 今月の支出
+  const teNokori    = totalSales - fixedTotal;
+  // 消費税貯金 = Airレジ税込売上 ÷ 11
   const shohizei    = Math.round(totalSales / 11);
-  const taxRate     = parseFloat(document.getElementById('taxRateSel')?.value || '0.20');
+  const savedRate = localStorage.getItem('ls_tax_rate') || '0.20';
+  const taxSel = document.getElementById('taxRateSel');
+  if(taxSel && taxSel.value !== savedRate) taxSel.value = savedRate;
+  const taxRate = parseFloat(savedRate);
   const shotokuTax  = Math.round(Math.max(0, teNokori) * taxRate);
   const jissitsu    = teNokori - shohizei - shotokuTax;
 
@@ -2224,7 +2232,7 @@ function renderMonthly() {
     {l:'税込売上',  v:yen(totalSales),   cls:'k-green', sub: ar?'Airレジ実データ':'推定値'},
     {l:'原価合計',  v:yen(rawCost),      cls:'k-red',   sub:'期首+仕入−期末'},
     {l:'粗利益',    v:yen(grossProfit),  cls:'k-blue',  sub:'売上−原価'},
-    {l:'固定費合計',v:yen(fixedTotal),   cls:'k-yellow',sub:'編集可'},
+    {l:'今月の支出', v:yen(fixedTotal),   cls:'k-yellow',sub:'キャッシュフロー'},
   ].map(k=>`<div class="kpi ${k.cls}" style="grid-column:auto"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
   // Left: 売上・原価 (auto)
@@ -2233,19 +2241,12 @@ function renderMonthly() {
     {l:'（消費税）',  v:yen(Math.round(totalSales/11)),    bold:false, sub:true},
     {l:'税抜売上',    v:yen(Math.round(totalSales/1.1)),   bold:false},
     null,
-    {l:'期首在庫',    v:yen(calcPrevTotal()),               bold:false},
-    {l:'当月仕入合計',v:yen(rawCost),                      bold:false},
+    {l:'期首在庫',    v:yen(prevTotal),                    bold:false},
+    {l:'当月仕入合計',v:yen(shiireTotal),                  bold:false},
     {l:'期末在庫',    v:yen(tanaTotal),                    bold:false},
     {l:'原価合計',    v:yen(rawCost),                      bold:true},
     null,
     {l:'粗利益',      v:yen(grossProfit),                  bold:true, accent:true},
-    null,
-    ...(freeeTotal>0 ? [
-      {l:'freee固定費',  v:yen(freeFixed),  bold:false, sub:true},
-      {l:'freee変動費',  v:yen(freeeVar),    bold:false, sub:true},
-      {l:'freee支出合計',v:yen(freeeTotal),  bold:false},
-    ] : []),
-    {l:'手残り概算',    v:yen(grossProfit - fixedTotal - freeeTotal), bold:true, accent: grossProfit - fixedTotal - freeeTotal >= 0},
   ];
   document.getElementById('monthlyLeftRows').innerHTML = leftItems.map(r => {
     if(!r) return '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">';
@@ -2276,7 +2277,23 @@ function updateTaxDisplay(teNokori, shohizei, shotokuTax, jissitsu) {
   if(ji) { ji.textContent = yen(jissitsu); ji.style.color = jissitsu>=0?'var(--accent2)':'var(--red)'; }
 }
 
-function onTaxRateChange() { renderMonthly(); }
+function onTaxRateChange() {
+  const sel = document.getElementById('taxRateSel');
+  const v = sel ? sel.value : '0.20';
+  localStorage.setItem('ls_tax_rate', v);
+  // renderMonthly を呼ばず直接再計算（セレクタを上書きしない）
+  const ar = airegiData;
+  const totalSales = ar ? ar.reduce((s,d)=>s+d.sales,0) : 0;
+  const fixedTotal = fixedCosts.reduce((s,r)=>s+r.amount,0);
+  const teNokori   = totalSales - fixedTotal;
+  const shohizei   = Math.round(totalSales / 11);
+  const taxRate    = parseFloat(v);
+  const shotokuTax = Math.round(Math.max(0, teNokori) * taxRate);
+  const jissitsu   = teNokori - shohizei - shotokuTax;
+  const lbl = document.getElementById('monthlyTaxRateLabel');
+  if(lbl) lbl.textContent = '手残り×' + Math.round(taxRate*100) + '%';
+  updateTaxDisplay(teNokori, shohizei, shotokuTax, jissitsu);
+}
 
 function renderFixedCostRows() {
   const fixedTotal = fixedCosts.reduce((s,r) => s+r.amount, 0);
@@ -2291,21 +2308,19 @@ function renderFixedCostRows() {
     </div>`).join('') || '<div style="color:var(--text3);font-size:12px;padding:12px 0;text-align:center">項目がありません</div>';
   document.getElementById('fixedCostTotal').textContent = yen(fixedTotal);
 
-  // Recalculate 手残り・税
+  // Recalculate 手残り = 税込売上 - 今月の支出
   const ar2 = airegiData;
   const totalSales2 = ar2 ? ar2.reduce((s,d)=>s+d.sales,0) : 0;
-  const shiireTotal2 = shiireData.reduce((s,r)=>s+r.amount,0);
-  const grossProfit2 = totalSales2 - shiireTotal2;
-  const teNokori2   = grossProfit2 - fixedTotal;
+  const teNokori2   = totalSales2 - fixedTotal;
   const shohizei2   = Math.round(totalSales2 / 11);
-  const taxRate2    = parseFloat(document.getElementById('taxRateSel')?.value || '0.20');
+  const taxRate2    = parseFloat(localStorage.getItem('ls_tax_rate') || '0.20');
   const shotokuTax2 = Math.round(Math.max(0, teNokori2) * taxRate2);
   const jissitsu2   = teNokori2 - shohizei2 - shotokuTax2;
   updateTaxDisplay(teNokori2, shohizei2, shotokuTax2, jissitsu2);
 }
 
 function openFixedCostModal() {
-  document.getElementById('fcModalTitle').textContent = '固定費を追加';
+  document.getElementById('fcModalTitle').textContent = '支出項目を追加';
   document.getElementById('fc-name').value   = '';
   document.getElementById('fc-amount').value = '';
   document.getElementById('fc-edit-id').value = '';
@@ -2314,7 +2329,7 @@ function openFixedCostModal() {
 }
 function openEditFixedCost(id) {
   const item = fixedCosts.find(r=>r.id===id); if(!item) return;
-  document.getElementById('fcModalTitle').textContent = '固定費を編集';
+  document.getElementById('fcModalTitle').textContent = '支出項目を編集';
   document.getElementById('fc-name').value   = item.name;
   document.getElementById('fc-amount').value = item.amount;
   document.getElementById('fc-edit-id').value = id;
