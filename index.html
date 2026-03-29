@@ -969,7 +969,7 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
 
 <!-- BOTTOM NAV -->
 <div class="bottom-nav">
-  <div class="bn-item active" id="bn-dash"    onclick="nav('dash')">   <div class="bn-ico">◈</div><div class="bn-lbl">ホーム</div></div>
+  <div class="bn-item active" id="bn-dash"    onclick="nav('monthly')">   <div class="bn-ico">◈</div><div class="bn-lbl">ホーム</div></div>
   <div class="bn-item"        id="bn-sales"   onclick="nav('sales')">  <div class="bn-ico">📊</div><div class="bn-lbl">売上</div></div>
   <div class="bn-item"        id="bn-tana"    onclick="nav('tana')">   <div class="bn-ico">◫</div><div class="bn-lbl">棚卸</div></div>
   <div class="bn-item"        id="bn-invoice" onclick="nav('invoice')"><div class="bn-ico">📷</div><div class="bn-lbl">伝票</div></div>
@@ -1501,7 +1501,7 @@ function fixedKey(m) {
 let stocks = loadLS(stocksKey(), JSON.parse(JSON.stringify(DEFAULT_STOCKS)));
 let shiireData = loadLS(shiireKey(), []);
 let airegiData = loadLS(airegiKey(), null);
-let curPage = 'dash';
+let curPage = 'monthly';
 let curTanaTab = 0;
 let openCard = null;
 let masterSheetIdx = 0;
@@ -1537,6 +1537,7 @@ const DOW_JP = ['月','火','水','木','金','土','日'];
 const PAGE_TITLES = {sales:'売上分析',shiire:'仕入台帳',tana:'棚卸入力',monthly:'月次集計',invoice:'伝票 AI読取',airegi:'Airレジ CSV',freee:'freee連携',master:'品目マスタ',settings:'設定・同期'};
 
 function nav(page) {
+  if(page === 'dash') page = 'monthly';
   curPage = page;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
@@ -1546,7 +1547,6 @@ function nav(page) {
   document.getElementById('bn-'+page)?.classList.add('active');
   document.getElementById('pageTitle').textContent = PAGE_TITLES[page];
   closeSidebar();
-  if(page==='dash')    renderDash();
   if(page==='sales')   renderSales();
   if(page==='shiire')  renderShiire();
   if(page==='tana')    renderTana();
@@ -1591,125 +1591,7 @@ function changeMonth(v) {
 // DASHBOARD
 // ════════════════════════════════════════════════════════════════════════
 
-function renderDash() {
-  // 表示月のデータを必ず再ロード
-  shiireData = loadLS(shiireKey(), []);
-  airegiData = loadLS(airegiKey(), null);
-  fixedCosts = loadLS(fixedKey(), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
-  const ar = airegiData;
-  const tanaTotal = calcGrandTotal();
-  const shiireTotal = shiireData.reduce((s,r)=>s+r.amount,0);
-
-  // KPI – use real airegi if loaded
-  const totalSales = (ar && ar.length>0) ? ar.reduce((s,d)=>s+d.sales,0) : 0;
-  const totalCust  = (ar && ar.length>0) ? ar.reduce((s,d)=>s+d.customers,0) : 0;
-  const rawProfit  = totalSales - shiireTotal;
-  document.getElementById('dashKpi').innerHTML = [
-    {l:'税込売上',   v:yen(totalSales),         sub: ar?'Airレジ実データ':'推定値',cls:'k-green'},
-    {l:'総客数',     v:totalCust+'人',           sub:'客単価 '+yen(Math.round(totalSales/totalCust)),cls:'k-blue'},
-    {l:'仕入合計',   v:yen(shiireTotal), sub:'食材+包材',cls:'k-red'},
-    {l:'棚卸合計',   v:yen(tanaTotal),           sub:'入力データより',cls:'k-yellow'},
-    {l:'粗利（概算）',v:yen(rawProfit),          sub:'売上−仕入',cls:'k-purple'},
-  ].map(k=>`<div class="kpi ${k.cls}"><div class="kpi-lbl">${k.l}</div><div class="kpi-val ${k.cls==='k-green'?'green':''}">${k.v}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
-
-  // Trend bars: 月次履歴から動的生成（「今月分を記録する」で保存したデータのみ表示）
-  const monthlyHist = loadLS('ls_monthly_history', []);
-  const selM = document.getElementById('monthSel')?.value || '';
-  const histMap = {};
-  monthlyHist.forEach(h => { histMap[h.month] = h; });
-  // 直近6ヶ月のキーを生成
-  const now2 = new Date();
-  const recentMonths = [];
-  for(let i=5;i>=0;i--) {
-    const d = new Date(now2.getFullYear(), now2.getMonth()-i, 1);
-    recentMonths.push(`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`);
-  }
-  const dynHist = recentMonths
-    .filter(m => histMap[m])
-    .map(m => ({
-      m: parseInt(m.split('/')[1])+'月',
-      s: histMap[m].totalSales || 0,
-      c: histMap[m].rawCost    || 0,
-      p: histMap[m].grossProfit|| 0,
-    }));
-  const trendEl = document.getElementById('trendBars');
-  if(dynHist.length === 0) {
-    trendEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:20px;text-align:center">月次データがまだありません<br><small>月末に「今月分を記録する」を押すと表示されます</small></div>';
-  } else {
-    const maxS = Math.max(...dynHist.map(d=>d.s), 1);
-    trendEl.innerHTML = dynHist.map(d=>`
-      <div class="t-grp">
-        <div class="t-inner">
-          <div class="t-bar bs" style="height:${Math.max(0,d.s)/maxS*62}px" title="${yen(d.s)}"></div>
-          <div class="t-bar bc" style="height:${Math.max(0,d.c)/maxS*62}px" title="${yen(d.c)}"></div>
-          <div class="t-bar bp" style="height:${Math.max(0,d.p)/maxS*62}px" title="${yen(d.p)}"></div>
-        </div>
-        <div class="t-lbl">${d.m}</div>
-      </div>`).join('');
-  }
-
-  // Tana snapshot
-  const totals = SHEETS.map((sh,i)=>({name:sh.name,total:calcSheetTotal(i)}));
-  document.getElementById('tanaSnapshot').innerHTML =
-    `<div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--accent2);margin-bottom:10px">${yen(tanaTotal)}</div>`+
-    totals.map(t=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--text2)">${t.name}</span><span style="font-family:'DM Mono',monospace">${yen(t.total)}</span></div>`).join('')+
-    `<div style="text-align:right;margin-top:8px"><span onclick="nav('tana')" style="font-size:11px;color:var(--accent);cursor:pointer;font-family:'DM Mono',monospace">棚卸入力へ →</span></div>`;
-
-  // Sales mini card
-  if(ar) {
-    const totalS=ar.reduce((s,d)=>s+d.sales,0);
-    const totalC=ar.reduce((s,d)=>s+d.customers,0);
-    document.getElementById('salesDataBadge').textContent='Airレジ実データ';
-    document.getElementById('salesDataBadge').style.background='var(--accent-l)';
-    document.getElementById('salesDataBadge').style.color='var(--accent2)';
-    document.getElementById('salesMiniCard').innerHTML=`
-      <div style="display:flex;gap:16px;flex-wrap:wrap">
-        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px">月間売上</div><div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--accent2)">${yen(totalS)}</div></div>
-        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px">客数</div><div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--text)">${totalC}人</div></div>
-        <div><div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:5px">客単価</div><div style="font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--text)">${yen(Math.round(totalS/totalC))}</div></div>
-      </div>
-      <div style="margin-top:12px"><button class="btn btn-sec" style="font-size:11px;padding:6px 14px" onclick="nav('sales')">詳細を見る →</button></div>`;
-  }
-
-  // TX: 仕入台帳・固定費・売上データから動的生成（選択中の月でフィルター）
-  const tagMap={food:'食材仕入',pack:'包材仕入',fixed:'固定費',salary:'給与',card:'カード',sale:'売上',unk:'未分類'};
-  const tagCls={food:'t-food',pack:'t-pack',fixed:'t-fixed',salary:'t-salary',card:'t-card',sale:'t-sale',unk:'t-unk'};
-  const selMonth = document.getElementById('monthSel')?.value || '';
-  const selYM = selMonth.replace('/', '-'); // 例: "2026-02"
-  const shiire = loadLS(shiireKey(), []);
-  const fixed  = loadLS(fixedKey(), []);
-  const txList = [];
-
-  // 仕入台帳
-  shiire.filter(r => r.date && r.date.startsWith(selYM)).forEach(r => {
-    const cat = r.cat || 'unk';
-    const tag = cat.includes('食材') ? 'food' : cat.includes('包材') ? 'pack' : 'unk';
-    const d = r.date ? r.date.slice(5).replace('-', '/') : '';
-    txList.push({d, v: r.vendor||'不明', tag, a: -(r.amount||0), _date: r.date});
-  });
-  // 固定費
-  fixed.filter(r => r.date && r.date.startsWith(selYM)).forEach(r => {
-    const d = r.date ? r.date.slice(5).replace('-', '/') : '';
-    txList.push({d, v: r.name||'固定費', tag:'fixed', a: -(r.amount||0), _date: r.date});
-  });
-  // 売上（Airレジ）
-  if(ar) {
-    const airTotal = ar.reduce((s,d)=>s+d.sales,0);
-    if(airTotal > 0) txList.push({d: selMonth.slice(5)+'/末', v:'Airレジ売上', tag:'sale', a: airTotal, _date: selYM+'-31'});
-  }
-
-  // 日付降順で最新10件
-  txList.sort((a,b) => (b._date||'').localeCompare(a._date||''));
-  const txShow = txList.slice(0, 10);
-
-  document.getElementById('dashTx').innerHTML = txShow.length
-    ? txShow.map(t=>`
-        <tr><td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">${t.d}</td>
-        <td style="font-size:12px">${t.v}</td>
-        <td><span class="tag ${tagCls[t.tag]||'t-unk'}">${tagMap[t.tag]||'その他'}</span></td>
-        <td class="r" style="color:${t.a<0?'var(--red)':'var(--accent)'}">${fmtAmt(t.a)}</td></tr>`).join('')
-    : '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px">この月の取引データがありません</td></tr>';
-}
+function renderDash() { renderMonthly?.(); }
 
 // ════════════════════════════════════════════════════════════════════════
 // SALES ANALYSIS
@@ -3528,7 +3410,7 @@ function resetAiregiData() {
   if(!confirm('売上データ（AirレジCSV）を削除します。\n棚卸・仕入台帳・品目マスタは残ります。\n\nよろしいですか？')) return;
   saveLS(airegiKey(), []);
   showToast('✓ 売上データを削除しました');
-  if(curPage === 'dash')  { renderDash?.(); }
+  if(curPage === 'monthly') renderMonthly?.();
   if(curPage === 'sales') renderSales();
 }
 
@@ -3626,7 +3508,7 @@ updateTanaMonthLabel();
     badge.textContent=parts[0]+'年'+parseInt(parts[1])+'月';
   }
 })();
-nav('dash');
+nav('monthly');
 
 // ── 起動時自動同期 ──────────────────────────────────────
 (async function autoSyncOnStart() {
