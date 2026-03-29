@@ -1540,7 +1540,7 @@ function nav(page) {
   if(page === 'dash') page = 'monthly';
   curPage = page;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.getElementById('page-'+page).classList.add('active');
+  document.getElementById('page-'+page)?.classList.add('active');
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   document.querySelectorAll('.bn-item').forEach(i=>i.classList.remove('active'));
