@@ -834,25 +834,20 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
   <div class="sec-title">伝票 AI 読取 <span class="s-badge">Claude AI</span></div>
   <div class="info-banner banner-purple">🤖 Claude AIが伝票の品目・金額を読み取り、食材・包材に自動分類します。実際の伝票写真で動作します。</div>
   <div class="upload-zone" id="uploadZone">
-    <input type="file" accept="image/*,application/pdf" id="fileInput" onchange="handleInvoiceFile(this)">
+    <input type="file" accept="image/*" capture="environment" id="fileInput" onchange="handleInvoiceFile(this)">
     <div class="upload-icon">📷</div>
-    <div class="upload-title">伝票を撮影 / 写真 / PDF を選択</div>
-    <div class="upload-sub">タップしてカメラを起動 / ギャラリーから選択 / PDFも可</div>
+    <div class="upload-title">伝票を撮影 または 写真を選択</div>
+    <div class="upload-sub">タップしてカメラを起動 / ギャラリーから選択</div>
     <div class="camera-hint">📱 スマホではカメラが直接起動します</div>
   </div>
   <div class="preview-wrap" id="previewWrap">
-    <div class="preview-img-w" id="previewImgWrap">
-      <img id="previewImg" src="" alt="" style="display:none">
-      <div id="previewPdf" style="display:none;background:var(--bg2);border-radius:10px;padding:24px;text-align:center;font-size:13px;color:var(--text2)">
-        <div style="font-size:36px;margin-bottom:8px">📄</div>
-        <div id="previewPdfName" style="font-weight:600;margin-bottom:4px"></div>
-        <div style="font-size:11px;color:var(--text3)">PDFを読み込みました</div>
-      </div>
-      <div class="preview-lbl" id="previewLbl">📷 撮影済み</div>
+    <div class="preview-img-w">
+      <img id="previewImg" src="" alt="">
+      <div class="preview-lbl">📷 撮影済み</div>
     </div>
     <div class="preview-actions">
       <button class="btn btn-primary" onclick="analyzeInvoice()">🤖 AI で読み取る</button>
-      <button class="btn btn-sec" onclick="resetInvoice()">別のファイルを選択</button>
+      <button class="btn btn-sec" onclick="resetInvoice()">別の写真を選択</button>
     </div>
   </div>
   <div class="analyzing" id="analyzingState">
@@ -1546,7 +1541,7 @@ let openCard = null;
 let masterSheetIdx = 0;
 let editItemId = null;
 let invItems = [];
-let invImgB64 = null, invImgType = 'image/jpeg', invIsPdf = false, invPdfName = '';
+let invImgB64 = null, invImgType = 'image/jpeg';
 
 function loadLS(key, def) { try { const d=localStorage.getItem(key); return d?JSON.parse(d):def; } catch(e){return def;} }
 function saveLS(key, val) {
@@ -1902,18 +1897,34 @@ function renderHirataCsvTable() {
 
   document.getElementById('hirataResultTitle').textContent = `ヒラタ ${items.length}明細 読込完了`;
   document.getElementById('hirataResultSub').textContent   = `対象月: ${months.join('・')}`;
-  document.getElementById('hirataTotal').textContent        = '¥' + total.toLocaleString('ja-JP');
+  document.getElementById('hirataTotal').textContent       = '¥' + total.toLocaleString('ja-JP');
+
+  // マスタ全品目名リスト（サジェスト用）
+  const allMasterNames = [];
+  SHEETS.forEach(sh => sh.items.forEach(it => { if(it.name) allMasterNames.push(it.name); }));
 
   document.getElementById('hirataCsvTable').innerHTML = items.map((item, idx) => {
-    const masterBadge = item._master
+    const matched = !!item._master;
+    const masterBadge = matched
       ? `<span style="font-size:10px;background:var(--accent-l);color:var(--accent2);padding:2px 7px;border-radius:20px;border:1px solid rgba(74,110,60,.2)">✓ マッチ</span>`
-      : `<span style="font-size:10px;background:var(--bg2);color:var(--text3);padding:2px 7px;border-radius:20px;border:1px solid var(--border2)">未登録</span>`;
+      : `<span style="font-size:10px;background:var(--yellow-l);color:var(--yellow);padding:2px 7px;border-radius:20px;border:1px solid rgba(184,138,8,.2)">未登録</span>`;
     const priceWarn = item._priceChanged
       ? `<span style="font-size:9px;background:var(--yellow-l);color:var(--yellow);padding:1px 5px;border-radius:10px;margin-left:4px">価格変更</span>`
       : '';
-    return `<tr style="border-bottom:1px solid rgba(212,207,195,.4)">
+    // 商品名：インライン編集 + datalist サジェスト
+    const listId = `hrt-dl-${idx}`;
+    const datalistOpts = allMasterNames.map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('');
+    return `<tr style="border-bottom:1px solid rgba(212,207,195,.4)" id="hrt-row-${idx}">
       <td style="padding:9px 12px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);white-space:nowrap">${item.date}</td>
-      <td style="padding:9px 12px;font-size:12px;color:var(--text)">${item.name}${priceWarn}</td>
+      <td style="padding:6px 10px;min-width:180px">
+        <datalist id="${listId}">${datalistOpts}</datalist>
+        <input list="${listId}" value="${item.name.replace(/"/g,'&quot;')}"
+          style="width:100%;font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--text);outline:none;transition:border-color .15s"
+          oninput="hirataNameInput(${idx},this.value)"
+          onfocus="this.style.borderColor='var(--accent)'"
+          onblur="this.style.borderColor='var(--border)'"
+        >${priceWarn}
+      </td>
       <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:11px">${item.qty}${item.unit}</td>
       <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:11px">¥${item.unitPrice.toLocaleString()}</td>
       <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;font-weight:600">¥${item.amount.toLocaleString()}</td>
@@ -1926,11 +1937,25 @@ function renderHirataCsvTable() {
           <option value="その他" ${item.cat==='その他'?'selected':''}>その他</option>
         </select>
       </td>
-      <td style="padding:9px 12px;text-align:center">${masterBadge}</td>
+      <td style="padding:9px 12px;text-align:center" id="hrt-badge-${idx}">${masterBadge}</td>
     </tr>`;
   }).join('');
 
   document.getElementById('hirataCsvResult').style.display = 'block';
+}
+
+function hirataNameInput(idx, val) {
+  _hirataItems[idx].name = val;
+  // マスタ再マッチング
+  const master = findMasterByName(val);
+  _hirataItems[idx]._master = master;
+  _hirataItems[idx]._masterPrice = master ? master.price : 0;
+  _hirataItems[idx]._priceChanged = master && _hirataItems[idx].unitPrice > 0 && master.price !== _hirataItems[idx].unitPrice;
+  // バッジだけ更新
+  const badge = document.getElementById('hrt-badge-' + idx);
+  if(badge) badge.innerHTML = master
+    ? `<span style="font-size:10px;background:var(--accent-l);color:var(--accent2);padding:2px 7px;border-radius:20px;border:1px solid rgba(74,110,60,.2)">✓ マッチ</span>`
+    : `<span style="font-size:10px;background:var(--yellow-l);color:var(--yellow);padding:2px 7px;border-radius:20px;border:1px solid rgba(184,138,8,.2)">未登録</span>`;
 }
 
 function confirmHirataCSV() {
@@ -2593,34 +2618,8 @@ function deleteFixedCost(id) {
 function handleInvoiceFile(input) {
   const file = input.files[0]; if(!file) return;
   const reader = new FileReader();
-
-  // PDF処理
-  if(file.type === 'application/pdf') {
-    reader.onload = e => {
-      invImgB64 = e.target.result.split(',')[1];
-      invImgType = 'application/pdf';
-      invIsPdf = true;
-      invPdfName = file.name;
-      document.getElementById('previewImg').style.display = 'none';
-      const pdfDiv = document.getElementById('previewPdf');
-      pdfDiv.style.display = 'block';
-      document.getElementById('previewPdfName').textContent = file.name;
-      document.getElementById('previewLbl').textContent = '📄 PDF読込済み';
-      document.getElementById('uploadZone').style.display = 'none';
-      hideInvoiceStates();
-      document.getElementById('previewWrap').classList.add('show');
-    };
-    reader.readAsDataURL(file);
-    return;
-  }
-
-  // 画像処理（既存）
-  invIsPdf = false;
   reader.onload = e => {
     const original = e.target.result;
-    document.getElementById('previewImg').style.display = 'block';
-    document.getElementById('previewPdf').style.display = 'none';
-    document.getElementById('previewLbl').textContent = '📷 撮影済み';
     try {
       const img = new Image();
       img.onerror = () => {
@@ -2667,7 +2666,7 @@ function handleInvoiceFile(input) {
   };
   reader.readAsDataURL(file);
 }
-function resetInvoice(){invImgB64=null;invIsPdf=false;invPdfName='';document.getElementById('fileInput').value='';document.getElementById('previewImg').style.display='block';document.getElementById('previewPdf').style.display='none';document.getElementById('previewWrap').classList.remove('show');document.getElementById('uploadZone').style.display='block';hideInvoiceStates();}
+function resetInvoice(){invImgB64=null;document.getElementById('fileInput').value='';document.getElementById('previewWrap').classList.remove('show');document.getElementById('uploadZone').style.display='block';hideInvoiceStates();}
 function resetInvoiceAll(){resetInvoice();document.getElementById('invSuccess').classList.remove('show');}
 function hideInvoiceStates(){document.getElementById('analyzingState').classList.remove('show');document.getElementById('invoiceResult').classList.remove('show');const _ed=document.getElementById('invoiceError');if(_ed)_ed.style.display='none';document.getElementById('invSuccess').classList.remove('show');}
 
