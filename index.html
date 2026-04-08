@@ -735,26 +735,6 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
   <div class="card" style="margin-bottom:16px" id="syncSettingsCard">
     <div class="card-title" style="margin-bottom:12px">同期設定</div>
 
-    <div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px">このデバイスの役割</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <label style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg2);border:2px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px;transition:all .12s" id="roleOwnerLabel">
-          <input type="radio" name="deviceRole" value="owner" id="roleOwner" onchange="saveDeviceRole('owner')" style="accent-color:var(--accent)">
-          <div>
-            <div style="font-weight:600">👑 オーナー</div>
-            <div style="font-size:10px;color:var(--text3)">仕入台帳・月次集計・全機能</div>
-          </div>
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg2);border:2px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px;transition:all .12s" id="roleStaffLabel">
-          <input type="radio" name="deviceRole" value="staff" id="roleStaff" onchange="saveDeviceRole('staff')" style="accent-color:var(--accent)">
-          <div>
-            <div style="font-weight:600">📦 スタッフ</div>
-            <div style="font-size:10px;color:var(--text3)">棚卸入力・伝票読み取り</div>
-          </div>
-        </label>
-      </div>
-    </div>
-
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <div style="background:var(--bg2);border-radius:10px;padding:12px">
         <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:.1em;margin-bottom:6px">最終同期</div>
