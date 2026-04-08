@@ -1568,7 +1568,26 @@ function changeMonth(v) {
   stocks = loadLS(stocksKey(v), JSON.parse(JSON.stringify(DEFAULT_STOCKS)));
   shiireData = loadLS(shiireKey(v), []);
   airegiData = loadLS(airegiKey(v), null);
-  fixedCosts = loadLS(fixedKey(v), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
+  // 固定費：その月のデータがなければ前月から引き継ぐ
+  const _fixedRaw = localStorage.getItem(fixedKey(v));
+  if(_fixedRaw) {
+    fixedCosts = JSON.parse(_fixedRaw);
+  } else {
+    // 前月を探して引き継ぐ
+    const _vp = v.split('/').map(Number);
+    const _pm = _vp[1] === 1 ? 12 : _vp[1] - 1;
+    const _py = _vp[1] === 1 ? _vp[0] - 1 : _vp[0];
+    const _prevKey = fixedKey(`${_py}/${String(_pm).padStart(2,'0')}`);
+    const _prevFixed = localStorage.getItem(_prevKey);
+    if(_prevFixed) {
+      // 前月の項目名・金額を引き継ぐ（日付はリセット）
+      fixedCosts = JSON.parse(_prevFixed).map(f => ({...f, date: undefined}));
+      saveLS(fixedKey(v), fixedCosts);
+      showToast('📋 前月のキャッシュフロー項目を引き継ぎました');
+    } else {
+      fixedCosts = JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS));
+    }
+  }
   freeeData  = JSON.parse(localStorage.getItem(freeeKey(v)) || '[]');
   // 右上バッジを更新
   const badge = document.getElementById('tbBadge');
@@ -1975,7 +1994,15 @@ async function startNextMonth() {
   stocks = nextStocks;
   shiireData = loadLS(shiireKey(nextVal), []);
   airegiData = loadLS(airegiKey(nextVal), null);
-  fixedCosts = loadLS(fixedKey(nextVal), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
+  // 翌月の固定費がなければ今月から引き継ぐ
+  const _nextFixedRaw = localStorage.getItem(fixedKey(nextVal));
+  if(_nextFixedRaw) {
+    fixedCosts = JSON.parse(_nextFixedRaw);
+  } else {
+    const _curFixed = loadLS(fixedKey(curVal), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
+    fixedCosts = _curFixed.map(f => ({...f, date: undefined}));
+    saveLS(fixedKey(nextVal), fixedCosts);
+  }
   const badge = document.getElementById('tbBadge');
   if(badge) badge.textContent = nextY + '年' + nextM + '月';
 
