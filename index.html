@@ -511,59 +511,6 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
 <!-- ═══════════ 仕入台帳 ═══════════ -->
 <div class="page" id="page-shiire">
   <div class="sec-title">仕入台帳 <span class="s-badge" id="shiireBadge"></span></div>
-
-  <!-- ヒラタCSV取込エリア -->
-  <div class="card" style="margin-bottom:14px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase">ヒラタ CSV 取込</div>
-      <span style="font-size:10px;color:var(--text3)">Shift-JIS対応</span>
-    </div>
-    <label style="display:flex;align-items:center;gap:10px;background:var(--bg2);border:2px dashed var(--border2);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s" id="hirataCsvLabel">
-      <span style="font-size:22px">📂</span>
-      <div>
-        <div style="font-size:13px;font-weight:500;color:var(--text2)">ヒラタ請求CSVを選択</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px" id="hirataCsvFileName">ファイル未選択</div>
-      </div>
-      <input type="file" accept=".csv" style="display:none" id="hirataCsvInput" onchange="handleHirataCSV(this)">
-    </label>
-  </div>
-
-  <!-- ヒラタCSV確認テーブル -->
-  <div id="hirataCsvResult" style="display:none;margin-bottom:14px">
-    <div class="card" style="padding:0;overflow:hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--accent-p);border-bottom:1px solid var(--border)">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:var(--accent2)" id="hirataResultTitle">読込完了</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px" id="hirataResultSub"></div>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-sec btn-sm" onclick="resetHirataCSV()">キャンセル</button>
-          <button class="btn btn-primary btn-sm" onclick="confirmHirataCSV()">✓ 仕入台帳に登録</button>
-        </div>
-      </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead>
-            <tr style="background:var(--bg2)">
-              <th style="padding:8px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)">日付</th>
-              <th style="padding:8px 12px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)">商品名</th>
-              <th style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)">数量</th>
-              <th style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)">単価</th>
-              <th style="padding:8px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)">金額</th>
-              <th style="padding:8px 12px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)">分類</th>
-              <th style="padding:8px 12px;text-align:center;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)">マスタ</th>
-            </tr>
-          </thead>
-          <tbody id="hirataCsvTable"></tbody>
-        </table>
-      </div>
-      <div style="padding:12px 18px;background:var(--bg2);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:12px;color:var(--text2)">合計</span>
-        <span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--accent2)" id="hirataTotal">¥0</span>
-      </div>
-    </div>
-  </div>
-
   <div class="card" style="margin-bottom:14px">
     <div class="form-grid">
       <div class="fg"><label>日付</label><input class="fi" type="date" id="s-date"></div>
@@ -748,6 +695,25 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
   <div class="card" style="margin-bottom:16px" id="syncSettingsCard">
     <div class="card-title" style="margin-bottom:12px">同期設定</div>
 
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:500;color:var(--text2);margin-bottom:8px">このデバイスの役割</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg2);border:2px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px;transition:all .12s" id="roleOwnerLabel">
+          <input type="radio" name="deviceRole" value="owner" id="roleOwner" onchange="saveDeviceRole('owner')" style="accent-color:var(--accent)">
+          <div>
+            <div style="font-weight:600">👑 オーナー</div>
+            <div style="font-size:10px;color:var(--text3)">仕入台帳・月次集計・全機能</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg2);border:2px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px;transition:all .12s" id="roleStaffLabel">
+          <input type="radio" name="deviceRole" value="staff" id="roleStaff" onchange="saveDeviceRole('staff')" style="accent-color:var(--accent)">
+          <div>
+            <div style="font-weight:600">📦 スタッフ</div>
+            <div style="font-size:10px;color:var(--text3)">棚卸入力・伝票読み取り</div>
+          </div>
+        </label>
+      </div>
+    </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <div style="background:var(--bg2);border-radius:10px;padding:12px">
@@ -1804,224 +1770,6 @@ function addShiire() {
 function delShiire(idx) { shiireData.splice(idx,1); saveLS(shiireKey(),shiireData); renderShiireTable(); pushKeyToGas('shiire', shiireData); }
 
 // ════════════════════════════════════════════════════════════════════════
-// ヒラタ CSV 取込
-// ════════════════════════════════════════════════════════════════════════
-
-let _hirataItems = []; // 読み込んだ明細行
-
-function handleHirataCSV(input) {
-  const file = input.files[0]; if(!file) return;
-  document.getElementById('hirataCsvFileName').textContent = file.name;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      // Shift-JIS / UTF-8 両対応
-      const buf = e.target.result;
-      const encodings = ['shift-jis', 'utf-8'];
-      let text = null;
-      for(const enc of encodings) {
-        try {
-          const decoded = new TextDecoder(enc, {fatal:true}).decode(buf);
-          if(!decoded.includes('\uFFFD')) { text = decoded; break; }
-        } catch(e) {}
-      }
-      if(!text) text = new TextDecoder('shift-jis').decode(buf);
-      parseHirataCSV(text);
-    } catch(err) { showToast('CSVの読み込みに失敗しました: ' + err.message); }
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function parseHirataCSV(text) {
-  text = text.replace(/^\uFEFF/, '');
-  const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim());
-  if(lines.length < 2) { showToast('CSVデータが空です'); return; }
-
-  // ヘッダー行
-  const header = lines[0].split(',').map(h => h.replace(/"/g,'').trim());
-  const col = k => header.indexOf(k);
-  const iDate    = col('取引日');
-  const iKbn     = col('取引区分名');
-  const iName    = col('商品名');
-  const iQty     = col('バラ総数量');
-  const iUnit    = col('単位名称');
-  const iPrice   = col('明細単価');
-  const iAmount  = col('明細金額');
-  const iZei     = col('軽減税率マーク');
-
-  const items = [];
-  lines.slice(1).forEach(line => {
-    const cols = line.split(',').map(c => c.replace(/"/g,'').trim());
-    const kbn  = cols[iKbn]  || '';
-    const name = cols[iName] || '';
-    const amt  = parseInt(cols[iAmount] || '0') || 0;
-
-    // 集計行・入金行・税額行・金額0はスキップ
-    if(kbn !== '売上') return;
-    if(amt === 0) return;
-    if(name.includes('**')) return;
-
-    const dateRaw = cols[iDate] || '';
-    const zei     = cols[iZei]  || '';
-    // 軽減税率マーク * あり → 食材、なし → 包材（ユーザーが後で変更可）
-    const cat = zei === '*' ? '食材' : '包材';
-
-    // 品目マスタとマッチング
-    const master = findMasterByName(name);
-    const unitPrice = parseInt(cols[iPrice] || '0') || 0;
-    const priceChanged = master && unitPrice > 0 && master.price !== unitPrice;
-
-    items.push({
-      date: dateRaw,          // 例: 2026/03/05
-      name: name.trim(),
-      qty:  parseInt(cols[iQty] || '0') || 0,
-      unit: cols[iUnit] || '',
-      unitPrice,
-      amount: amt,
-      cat,
-      _master: master,
-      _priceChanged: priceChanged,
-      _masterPrice: master ? master.price : 0,
-    });
-  });
-
-  if(items.length === 0) { showToast('⚠️ 取込対象の明細がありません'); return; }
-  _hirataItems = items;
-  renderHirataCsvTable();
-}
-
-function renderHirataCsvTable() {
-  const items = _hirataItems;
-  const total = items.reduce((s,i) => s+i.amount, 0);
-  const months = [...new Set(items.map(i => i.date.slice(0,7).replace('/','-')))];
-
-  document.getElementById('hirataResultTitle').textContent = `ヒラタ ${items.length}明細 読込完了`;
-  document.getElementById('hirataResultSub').textContent   = `対象月: ${months.join('・')}`;
-  document.getElementById('hirataTotal').textContent       = '¥' + total.toLocaleString('ja-JP');
-
-  // マスタ全品目名リスト（サジェスト用）
-  const allMasterNames = [];
-  SHEETS.forEach(sh => sh.items.forEach(it => { if(it.name) allMasterNames.push(it.name); }));
-
-  document.getElementById('hirataCsvTable').innerHTML = items.map((item, idx) => {
-    const matched = !!item._master;
-    const masterBadge = matched
-      ? `<span style="font-size:10px;background:var(--accent-l);color:var(--accent2);padding:2px 7px;border-radius:20px;border:1px solid rgba(74,110,60,.2)">✓ マッチ</span>`
-      : `<span style="font-size:10px;background:var(--yellow-l);color:var(--yellow);padding:2px 7px;border-radius:20px;border:1px solid rgba(184,138,8,.2)">未登録</span>`;
-    const priceWarn = item._priceChanged
-      ? `<span style="font-size:9px;background:var(--yellow-l);color:var(--yellow);padding:1px 5px;border-radius:10px;margin-left:4px">価格変更</span>`
-      : '';
-    // 商品名：インライン編集 + datalist サジェスト
-    const listId = `hrt-dl-${idx}`;
-    const datalistOpts = allMasterNames.map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('');
-    return `<tr style="border-bottom:1px solid rgba(212,207,195,.4)" id="hrt-row-${idx}">
-      <td style="padding:9px 12px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);white-space:nowrap">${item.date}</td>
-      <td style="padding:6px 10px;min-width:180px">
-        <datalist id="${listId}">${datalistOpts}</datalist>
-        <input list="${listId}" value="${item.name.replace(/"/g,'&quot;')}"
-          style="width:100%;font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--text);outline:none;transition:border-color .15s"
-          oninput="hirataNameInput(${idx},this.value)"
-          onfocus="this.style.borderColor='var(--accent)'"
-          onblur="this.style.borderColor='var(--border)'"
-        >${priceWarn}
-      </td>
-      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:11px">${item.qty}${item.unit}</td>
-      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:11px">¥${item.unitPrice.toLocaleString()}</td>
-      <td style="padding:9px 12px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;font-weight:600">¥${item.amount.toLocaleString()}</td>
-      <td style="padding:9px 12px;text-align:center">
-        <select onchange="_hirataItems[${idx}].cat=this.value"
-          style="font-size:11px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:3px 6px;color:var(--text2);cursor:pointer;outline:none">
-          <option value="食材" ${item.cat==='食材'?'selected':''}>食材</option>
-          <option value="包材" ${item.cat==='包材'?'selected':''}>包材</option>
-          <option value="道具" ${item.cat==='道具'?'selected':''}>道具</option>
-          <option value="その他" ${item.cat==='その他'?'selected':''}>その他</option>
-        </select>
-      </td>
-      <td style="padding:9px 12px;text-align:center" id="hrt-badge-${idx}">${masterBadge}</td>
-    </tr>`;
-  }).join('');
-
-  document.getElementById('hirataCsvResult').style.display = 'block';
-}
-
-function hirataNameInput(idx, val) {
-  _hirataItems[idx].name = val;
-  // マスタ再マッチング
-  const master = findMasterByName(val);
-  _hirataItems[idx]._master = master;
-  _hirataItems[idx]._masterPrice = master ? master.price : 0;
-  _hirataItems[idx]._priceChanged = master && _hirataItems[idx].unitPrice > 0 && master.price !== _hirataItems[idx].unitPrice;
-  // バッジだけ更新
-  const badge = document.getElementById('hrt-badge-' + idx);
-  if(badge) badge.innerHTML = master
-    ? `<span style="font-size:10px;background:var(--accent-l);color:var(--accent2);padding:2px 7px;border-radius:20px;border:1px solid rgba(74,110,60,.2)">✓ マッチ</span>`
-    : `<span style="font-size:10px;background:var(--yellow-l);color:var(--yellow);padding:2px 7px;border-radius:20px;border:1px solid rgba(184,138,8,.2)">未登録</span>`;
-}
-
-function confirmHirataCSV() {
-  // 価格変更のある品目をチェック
-  const changed = _hirataItems.filter(i => i._priceChanged);
-  if(changed.length > 0) {
-    _pendingPriceChanges = changed.map((item,i) => ({item, newPrice: item.unitPrice, checked: true, idx: i}));
-    const list = _pendingPriceChanges.map((pc,i) =>
-      `<label style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;gap:10px">
-        <input type="checkbox" id="pcc-${i}" checked style="width:18px;height:18px;cursor:pointer;flex-shrink:0" onchange="_pendingPriceChanges[${i}].checked=this.checked">
-        <span style="flex:1;font-size:13px">${pc.item.name}</span>
-        <span style="white-space:nowrap">
-          <span class="pc-old">¥${pc.item._masterPrice.toLocaleString()}</span>
-          <span style="margin:0 6px;color:var(--text3)">→</span>
-          <span class="pc-new">¥${pc.item.unitPrice.toLocaleString()}</span>
-        </span>
-      </label>`
-    ).join('');
-    document.getElementById('priceChangeList').innerHTML = list;
-    document.getElementById('priceModalOverlay').classList.add('open');
-    _pendingInvoiceCallback = () => doImportHirataCSV(true);
-    return;
-  }
-  doImportHirataCSV(false);
-}
-
-function doImportHirataCSV(priceUpdated) {
-  // 月ごとにグループ化して仕入台帳に登録
-  _hirataItems.forEach(item => {
-    const dp = item.date.split('/'); // ['2026','03','05']
-    if(dp.length < 3) return;
-    const monthKey = 'ls_shiire_' + dp[0] + '-' + dp[1];
-    const dateStr  = dp[0] + '/' + dp[1] + '/' + parseInt(dp[2]);
-    const records  = JSON.parse(localStorage.getItem(monthKey) || '[]');
-    records.push({
-      id:     'hrt_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-      date:   dateStr,
-      vendor: 'ヒラタ食材',
-      cat:    item.cat,
-      amount: item.amount,
-      memo:   item.name,
-      qty:    item.qty,
-      unit:   item.unit,
-      unitPrice: item.unitPrice,
-    });
-    localStorage.setItem(monthKey, JSON.stringify(records));
-    // 表示中の月ならshiireDataに反映
-    if(monthKey === shiireKey()) shiireData = records;
-    // GASに保存
-    const m = dp[0] + '/' + dp[1];
-    pushKeyToGas('shiire', records, m);
-  });
-
-  showToast('✓ ヒラタ ' + _hirataItems.length + '明細を仕入台帳に登録しました');
-  resetHirataCSV();
-  renderShiireTable();
-}
-
-function resetHirataCSV() {
-  _hirataItems = [];
-  document.getElementById('hirataCsvResult').style.display = 'none';
-  document.getElementById('hirataCsvInput').value = '';
-  document.getElementById('hirataCsvFileName').textContent = 'ファイル未選択';
-}
-
-// ════════════════════════════════════════════════════════════════════════
 // 棚卸
 // ════════════════════════════════════════════════════════════════════════
 
@@ -2195,28 +1943,23 @@ async function startNextMonth() {
   const nextVal = `${nextY}/${String(nextM).padStart(2,'0')}`;
   const curVal = sel.value;
 
-  // ① 今月の stocks を確定状態で保存
+  // ① 今月のstocksをそのまま保存（stock値を保持）
   const curStocks = loadLS(stocksKey(curVal), {});
-  Object.keys(curStocks).forEach(id => {
-    const s = curStocks[id];
-    if(!s) return;
-    const keepPrev = s.prevStock !== undefined ? s.prevStock : (s.stock ?? 0);
-    curStocks[id] = { prevStock: keepPrev };
-  });
   localStorage.setItem('ls_stocks_' + curVal.replace('/', '-'), JSON.stringify(curStocks));
   await pushKeyToGas('stocks', curStocks, curVal);
 
-  // ② 翌月の期首データを作成（GASの既存データより優先して上書き）
-  const nextStocks = {};
+  // ② 翌月の期首データを作成（今月のstock値 → 翌月のprevStock）
+  const nextKey = 'ls_stocks_' + nextVal.replace('/', '-');
+  const existingNext = JSON.parse(localStorage.getItem(nextKey) || '{}');
   Object.keys(curStocks).forEach(id => {
     const s = curStocks[id];
-    if(!s) return;
-    const prev = s.prevStock !== undefined ? s.prevStock : (s.stock !== undefined ? s.stock : null);
-    if(prev !== null) nextStocks[id] = { prevStock: prev };
+    if(!s || s.stock === undefined) return;
+    // 今月の期末在庫(stock)を翌月の期首(prevStock)に引き継ぐ
+    if(!existingNext[id]) existingNext[id] = {};
+    existingNext[id].prevStock = s.stock;
   });
-  const nextKey = 'ls_stocks_' + nextVal.replace('/', '-');
-  localStorage.setItem(nextKey, JSON.stringify(nextStocks));
-  await pushKeyToGas('stocks', nextStocks, nextVal);
+  localStorage.setItem(nextKey, JSON.stringify(existingNext));
+  await pushKeyToGas('stocks', existingNext, nextVal);
 
   // ③ 月セレクタを翌月に切り替え（GAS同期せずlocalStorageから読む）
   let opt = Array.from(sel.options).find(o => o.value === nextVal);
@@ -2464,9 +2207,9 @@ function renderMonthly() {
   }
   const dynHist = recentMonths.filter(m => histMap[m]).map(m => ({
     m: parseInt(m.split('/')[1])+'月',
-    s: histMap[m].totalSales || 0,
-    c: histMap[m].rawCost    || 0,
-    p: histMap[m].grossProfit|| 0,
+    s: Number(histMap[m].totalSales)  || 0,
+    c: Number(histMap[m].rawCost)     || 0,
+    p: Number(histMap[m].grossProfit) || 0,
   }));
   const trendEl = document.getElementById('trendBars');
   if(trendEl) {
@@ -2623,6 +2366,7 @@ function handleInvoiceFile(input) {
     try {
       const img = new Image();
       img.onerror = () => {
+        // 画像読み込み失敗 → 圧縮なしでそのまま使う
         invImgB64 = original.split(',')[1];
         invImgType = file.type || 'image/jpeg';
         document.getElementById('previewImg').src = original;
@@ -2646,6 +2390,7 @@ function handleInvoiceFile(input) {
           invImgType = 'image/jpeg';
           document.getElementById('previewImg').src = compressed;
         } catch(compressErr) {
+          // Canvas圧縮失敗 → 元画像をそのまま使う
           invImgB64 = original.split(',')[1];
           invImgType = file.type || 'image/jpeg';
           document.getElementById('previewImg').src = original;
@@ -2656,6 +2401,7 @@ function handleInvoiceFile(input) {
       };
       img.src = original;
     } catch(err) {
+      // 万が一の保険
       invImgB64 = original.split(',')[1];
       invImgType = file.type || 'image/jpeg';
       document.getElementById('previewImg').src = original;
@@ -3456,22 +3202,9 @@ async function pullFromGas() {
       body: JSON.stringify({ action:'loadAll', month })
     });
     const data = await res.json();
-    // 全データをGASの値で上書き（sheetsはtanaUnit/unitLabel/qtyをローカル優先でマージ）
+    // 全データをGASの値で上書き（マスターはGAS）
     if(data.stocks)     { stocks = data.stocks; saveLS(stocksKey(), stocks); }
-    if(data.sheets)     {
-      const localSheets = loadLS('ls_sheets', []);
-      const localMap = {};
-      localSheets.forEach(sh => sh.items.forEach(it => { localMap[it.id] = it; }));
-      data.sheets.forEach(sh => sh.items.forEach(it => {
-        const loc = localMap[it.id];
-        if(loc) {
-          if(loc.tanaUnit  !== undefined) it.tanaUnit  = loc.tanaUnit;
-          if(loc.unitLabel !== undefined) it.unitLabel = loc.unitLabel;
-          if(loc.qty       !== undefined) it.qty       = loc.qty;
-        }
-      }));
-      SHEETS = data.sheets; saveLS('ls_sheets', SHEETS);
-    }
+    if(data.sheets)     { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
     if(data.shiire)     { shiireData = data.shiire; saveLS(shiireKey(), data.shiire); }
     if(data.fixedCosts) { fixedCosts = data.fixedCosts; saveLS(fixedKey(), data.fixedCosts); }
     if(data.airegi)     { airegiData = data.airegi; saveLS(airegiKey(), data.airegi); }
@@ -3491,9 +3224,10 @@ async function saveMonthSnapshot() {
   const airegi = loadLS(airegiKey(), []);
   const shiire = loadLS(shiireKey(), []);
   const fixedCosts = loadLS(fixedKey(), DEFAULT_FIXED_COSTS);
-  const totalSales = airegi.reduce((s,r)=>s+r.price,0);
-  const rawCost = shiire.reduce((s,r)=>s+r.amount,0);
-  const fixedTotal = fixedCosts.reduce((s,f)=>s+f.amount,0);
+  const totalSales = Array.isArray(airegi) && airegi.length > 0
+    ? airegi.reduce((s,r) => s + (r.sales || r.price || 0), 0) : 0;
+  const rawCost    = shiire.reduce((s,r)=>s+(r.amount||0),0);
+  const fixedTotal = Array.isArray(fixedCosts) ? fixedCosts.reduce((s,f)=>s+(f.amount||0),0) : 0;
   const grossProfit = totalSales - rawCost;
   const tanaTotal = calcGrandTotal();
   try {
@@ -3531,6 +3265,11 @@ function saveGasUrl() {
   updateSyncStatus();
 }
 
+function saveDeviceRole() {
+  const role = document.getElementById('deviceRoleSelect').value;
+  localStorage.setItem('ls_device_role', role);
+  showToast(`✓ デバイスの役割を「${role === 'owner' ? 'オーナー' : 'スタッフ'}」に設定しました`);
+}
 
 // ════════════════════════════════════════════════════════════════════════
 // MASTER
@@ -3767,9 +3506,7 @@ updateTanaMonthLabel();
 })();
 nav('monthly');
 
-// ── 起動時自動同期（無効化中）──────────────────────────────────────
-// 手動同期のみ使用。設定・同期ページの「GASから取得」ボタンで同期してください。
-/*
+// ── 起動時自動同期 ──────────────────────────────────────
 (async function autoSyncOnStart() {
   const url = getGasUrl();
   if(!url) return;
@@ -3794,20 +3531,7 @@ nav('monthly');
     });
     const data = await res.json();
     if(data.stocks)     { stocks = data.stocks; saveLS(stocksKey(), stocks); }
-    if(data.sheets)     {
-      const localSheets = loadLS('ls_sheets', []);
-      const localMap = {};
-      localSheets.forEach(sh => sh.items.forEach(it => { localMap[it.id] = it; }));
-      data.sheets.forEach(sh => sh.items.forEach(it => {
-        const loc = localMap[it.id];
-        if(loc) {
-          if(loc.tanaUnit  !== undefined) it.tanaUnit  = loc.tanaUnit;
-          if(loc.unitLabel !== undefined) it.unitLabel = loc.unitLabel;
-          if(loc.qty       !== undefined) it.qty       = loc.qty;
-        }
-      }));
-      SHEETS = data.sheets; saveLS('ls_sheets', SHEETS);
-    }
+    if(data.sheets)     { SHEETS = data.sheets; saveLS('ls_sheets', SHEETS); }
     if(data.shiire)     { shiireData = data.shiire; saveLS(shiireKey(), data.shiire); }
     if(data.fixedCosts) { fixedCosts = data.fixedCosts; saveLS(fixedKey(), data.fixedCosts); }
     if(data.airegi)     { airegiData = data.airegi; saveLS(airegiKey(), data.airegi); }
@@ -3819,8 +3543,7 @@ nav('monthly');
   } catch(e) {
     showToast('⚠️ 起動時同期失敗（オフライン？）', 3000);
   }
-*/
-// })();
+})();
 
 
 </script>
