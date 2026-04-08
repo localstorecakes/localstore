@@ -511,7 +511,47 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
 <!-- ═══════════ 仕入台帳 ═══════════ -->
 <div class="page" id="page-shiire">
   <div class="sec-title">仕入台帳 <span class="s-badge" id="shiireBadge"></span></div>
+
+  <!-- ヒラタ CSV 取込 -->
+  <div class="card" style="margin-bottom:14px;border-top:3px solid var(--blue)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <span style="font-size:20px">📦</span>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--text)">ヒラタ CSV 一括取込</div>
+        <div style="font-size:11px;color:var(--text3)">注文明細CSVを取り込みます。伝票単位でまとめて仕入台帳に追加されます。</div>
+      </div>
+    </div>
+    <div class="csv-upload" id="hirataCsvZone" style="padding:24px 16px;border-color:var(--blue);margin-bottom:0"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="event.preventDefault();this.classList.remove('drag');handleHirataFile(event.dataTransfer.files[0])">
+      <input type="file" accept=".csv,.txt" onchange="handleHirataFile(this.files[0]);this.value=''">
+      <div style="font-size:32px;margin-bottom:8px">📋</div>
+      <div style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:4px">CSVをドロップ、またはタップして選択</div>
+      <div style="font-size:11px;color:var(--text3)">取引日 / 商品名 / バラ総数量 / 明細単価 / 明細金額 を自動認識</div>
+    </div>
+    <div id="hirataPreview" style="display:none;margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+        <div style="font-size:13px;font-weight:700;color:var(--text)" id="hirataPreviewTitle"></div>
+        <span id="hirataUnmatch" style="display:none;font-size:11px;color:var(--red);font-weight:700;background:#fff5f5;padding:3px 9px;border-radius:20px;border:1px solid #f5c8c0"></span>
+      </div>
+      <div id="hirataInvoiceList" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg2);border-radius:10px;margin-top:10px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:12px;color:var(--text3)">
+          合計: <strong style="font-family:'DM Mono',monospace;font-size:16px;color:var(--accent2)" id="hirataPreviewTotal"></strong>
+          <span style="margin-left:10px;font-size:11px;color:var(--text3)" id="hirataPreviewCount"></span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sec btn-sm" onclick="closeHirataPreview()">キャンセル</button>
+          <button class="btn btn-primary btn-sm" onclick="importHirataRows()">✓ 仕入台帳に追加</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 手入力フォーム -->
   <div class="card" style="margin-bottom:14px">
+    <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.15em;text-transform:uppercase;margin-bottom:10px">手入力</div>
     <div class="form-grid">
       <div class="fg"><label>日付</label><input class="fi" type="date" id="s-date"></div>
       <div class="fg"><label>業者</label><select class="fi" id="s-vendor"><option>だるまや</option><option>ヒラタ食材</option><option>ヒラタ包材</option><option>テクモア</option><option>ペーストリート/他</option><option>モノタロウ</option></select></div>
@@ -2791,6 +2831,237 @@ function doImportInvoice(priceUpdated) {
   document.getElementById('invSuccessSub').textContent = `${vendor} / ${yen(total)} / ${invItems.length}品目`;
   document.getElementById('invSuccessItems').innerHTML = invItems.map(i=>`<div>${i.name} × ${i.qty} = ${yen(i.amount)}</div>`).join('');
   document.getElementById('invoiceResult').classList.remove('show');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// ヒラタ CSV 取込
+// ヘッダー: 取引日,取引区分名,伝票番号,得意先名,商品名,入数,ケース数量,
+//           ボール数量,バラ総数量,単位名称,明細単価,明細金額,行摘要,軽減税率マーク
+// ════════════════════════════════════════════════════════════════════════
+
+// _hirataInvoices: [ { invNo, date, vendor, items:[{name,qty,unit,unitPrice,amount,category}] } ]
+let _hirataInvoices = [];
+
+function handleHirataFile(file) {
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const buf = e.target.result;
+    let text = null;
+    for(const enc of ['shift-jis','utf-8']) {
+      try {
+        const d = new TextDecoder(enc, {fatal:true}).decode(buf);
+        if(!d.includes('\uFFFD')) { text = d; break; }
+      } catch(_) {}
+    }
+    if(!text) text = new TextDecoder('shift-jis').decode(buf);
+    parseHirataCSV(text);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseHirataCSV(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const lines = text.split(/\r\n|\r|\n/).filter(l => l.trim());
+  if(lines.length < 2) { showToast('⚠️ データが空です'); return; }
+
+  // ヘッダー行を解析
+  const header = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
+
+  // 列インデックスをヘッダー名で特定
+  const col = name => header.findIndex(h => h === name);
+  const iDate    = col('取引日');
+  const iKubun   = col('取引区分名');
+  const iInvNo   = col('伝票番号');
+  const iName    = col('商品名');
+  const iBara    = col('バラ総数量');
+  const iUnit    = col('単位名称');
+  const iTanka   = col('明細単価');
+  const iKingaku = col('明細金額');
+
+  if(iName < 0 || iKingaku < 0) {
+    showToast('⚠️ ヒラタCSVのフォーマットが認識できません');
+    return;
+  }
+
+  // 「売上」行のみ抽出し、伝票番号でグループ化
+  const invoiceMap = new Map(); // invNo -> { date, items[] }
+
+  for(let i = 1; i < lines.length; i++) {
+    const cols = splitHirataCSVLine(lines[i]);
+    if(cols.length < 8) continue;
+
+    const kubun  = iKubun  >= 0 ? cols[iKubun]?.trim()  : '';
+    const invNo  = iInvNo  >= 0 ? cols[iInvNo]?.trim()  : '';
+    const date   = iDate   >= 0 ? cols[iDate]?.trim()   : '';
+    const name   = iName   >= 0 ? cols[iName]?.trim()   : '';
+    const bara   = iBara   >= 0 ? parseFloat(cols[iBara]  || '0') : 0;
+    const unit   = iUnit   >= 0 ? cols[iUnit]?.trim()   : '個';
+    const tanka  = iTanka  >= 0 ? parseFloat(cols[iTanka] || '0') : 0;
+    const kingaku= iKingaku>= 0 ? parseInt((cols[iKingaku]||'0').replace(/[^\d]/g,'')) : 0;
+
+    // 売上行のみ（入金・集計・税額行を除外）
+    if(kubun !== '売上') continue;
+    // 金額ゼロ・カタログ等を除外
+    if(kingaku === 0) continue;
+    // 商品名が空白のみの行を除外
+    if(!name || /^\s*\*+/.test(name)) continue;
+
+    // 分類推定（品目マスタ照合 or 名前から推測）
+    const master = findMasterByName(name);
+    let category = '食材';
+    if(master) {
+      // マスタのシート名から分類推定
+      for(const sh of SHEETS) {
+        if(sh.items.some(it => it.id === master.id)) {
+          if(/包材|資材|ラッピング/.test(sh.name)) category = '包材';
+          break;
+        }
+      }
+    } else {
+      // 名前から包材っぽいか判定
+      if(/袋|箱|ボックス|ケース|テープ|シート|ラッピング|リボン|乾燥剤|ＰＣ|PC|チャーム/.test(name)) {
+        category = '包材';
+      }
+    }
+
+    const key = invNo || date; // 伝票番号 or 日付でグループ化
+    if(!invoiceMap.has(key)) {
+      invoiceMap.set(key, { invNo, date: date.replace(/\//g,'-'), items: [] });
+    }
+    invoiceMap.get(key).items.push({
+      name, qty: bara||1, unit: unit||'個', unitPrice: tanka, amount: kingaku,
+      category, _master: master||null,
+      _masterPrice: master ? master.price : null,
+      _priceChanged: master && tanka > 0 && tanka !== master.price
+    });
+  }
+
+  if(invoiceMap.size === 0) { showToast('⚠️ 取込できる売上行がありません'); return; }
+
+  _hirataInvoices = Array.from(invoiceMap.values());
+  renderHirataPreview();
+}
+
+function splitHirataCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for(let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if(c === '"') { inQ = !inQ; }
+    else if(c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else cur += c;
+  }
+  result.push(cur);
+  return result.map(s => s.replace(/^"|"$/g,''));
+}
+
+function renderHirataPreview() {
+  const totalAmt = _hirataInvoices.reduce((s,inv) => s + inv.items.reduce((ss,it)=>ss+it.amount,0), 0);
+  const totalItems = _hirataInvoices.reduce((s,inv) => s + inv.items.length, 0);
+  const unmatch = _hirataInvoices.reduce((s,inv) => s + inv.items.filter(it=>!it._master).length, 0);
+
+  document.getElementById('hirataPreviewTitle').textContent =
+    `${_hirataInvoices.length}伝票 / ${totalItems}品目 を読み込みました`;
+  const uEl = document.getElementById('hirataUnmatch');
+  if(unmatch > 0) { uEl.textContent = `⚠️ マスタ未照合 ${unmatch}件`; uEl.style.display='inline'; }
+  else uEl.style.display = 'none';
+  document.getElementById('hirataPreviewTotal').textContent = yen(totalAmt);
+  document.getElementById('hirataPreviewCount').textContent = `伝票${_hirataInvoices.length}枚`;
+
+  document.getElementById('hirataInvoiceList').innerHTML = _hirataInvoices.map((inv, gi) => {
+    const invTotal = inv.items.reduce((s,it)=>s+it.amount,0);
+    const dateDisp = inv.date.replace(/-/g,'/');
+    return `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">${dateDisp}</span>
+          <span style="font-size:11px;font-weight:700;color:var(--text)">伝票 #${inv.invNo||'—'}</span>
+          <span style="font-size:10px;color:var(--text3)">${inv.items.length}品目</span>
+        </div>
+        <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--accent2)">${yen(invTotal)}</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="edit-table" style="min-width:420px">
+          <thead><tr>
+            <th>商品名</th>
+            <th style="text-align:center;width:60px">数量</th>
+            <th style="text-align:right;width:80px">単価</th>
+            <th style="text-align:right;width:80px">金額</th>
+            <th style="width:75px">分類</th>
+            <th style="width:30px"></th>
+          </tr></thead>
+          <tbody>
+            ${inv.items.map((it, ii) => {
+              const noM = !it._master;
+              const chg = it._priceChanged;
+              const bg = noM ? 'background:#fff8f8' : chg ? 'background:var(--yellow-l)' : '';
+              return `<tr style="${bg}">
+                <td>
+                  <div style="font-size:12px;color:var(--text);margin-bottom:${noM?'2':'0'}px">${it.name}</div>
+                  ${noM ? `<div style="font-size:10px;color:var(--red)">⚠️ マスタ未照合</div>` :
+                           `<div style="font-size:10px;color:var(--accent)">✓ ${it._master.name}</div>`}
+                  ${chg ? `<div style="font-size:10px;color:var(--red)">単価変更: ¥${it._masterPrice.toLocaleString()} → ¥${it.unitPrice.toLocaleString()}</div>` : ''}
+                </td>
+                <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px">${it.qty} ${it.unit}</td>
+                <td style="text-align:right;font-family:'DM Mono',monospace;font-size:12px">¥${it.unitPrice.toLocaleString()}</td>
+                <td style="text-align:right;font-family:'DM Mono',monospace;font-size:12px;font-weight:600">¥${it.amount.toLocaleString()}</td>
+                <td>
+                  <select class="cat-sel" style="min-width:65px;font-size:11px"
+                    onchange="_hirataInvoices[${gi}].items[${ii}].category=this.value">
+                    <option ${it.category==='食材'?'selected':''}>食材</option>
+                    <option ${it.category==='包材'?'selected':''}>包材</option>
+                    <option ${it.category==='その他'?'selected':''}>その他</option>
+                  </select>
+                </td>
+                <td style="text-align:center">
+                  <button onclick="_hirataInvoices[${gi}].items.splice(${ii},1);if(_hirataInvoices[${gi}].items.length===0)_hirataInvoices.splice(${gi},1);renderHirataPreview()"
+                    style="background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:2px 4px">×</button>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('hirataPreview').style.display = 'block';
+  document.getElementById('hirataPreview').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function closeHirataPreview() {
+  _hirataInvoices = [];
+  document.getElementById('hirataPreview').style.display = 'none';
+}
+
+function importHirataRows() {
+  if(_hirataInvoices.length === 0) return;
+  const records = loadLS(shiireKey(), []);
+  let addedCount = 0, totalAmt = 0;
+
+  _hirataInvoices.forEach(inv => {
+    inv.items.forEach(it => {
+      if(!it.amount) return;
+      records.push({
+        id: 'hrt_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+        date: inv.date.replace(/-/g,'/'),
+        vendor: 'ヒラタ食材',
+        cat: it.category,
+        amount: it.amount,
+        memo: it.name,
+        qty: it.qty, unit: it.unit, unitPrice: it.unitPrice
+      });
+      addedCount++;
+      totalAmt += it.amount;
+    });
+  });
+
+  saveLS(shiireKey(), records);
+  if(typeof pushKeyToGas === 'function') pushKeyToGas('shiire', records);
+  showToast(`✓ ヒラタ ${addedCount}件 ${yen(totalAmt)} を仕入台帳に追加しました`);
+  closeHirataPreview();
+  if(typeof renderShiire === 'function') renderShiire();
 }
 
 // ════════════════════════════════════════════════════════════════════════
