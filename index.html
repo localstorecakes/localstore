@@ -1982,25 +1982,26 @@ async function startNextMonth() {
   const nextVal = `${nextY}/${String(nextM).padStart(2,'0')}`;
   const curVal = sel.value;
 
-  // ① 今月のstocksをそのまま保存（stock値を保持）
+  // ① 今月のstocksをそのまま保存
   const curStocks = loadLS(stocksKey(curVal), {});
   localStorage.setItem('ls_stocks_' + curVal.replace('/', '-'), JSON.stringify(curStocks));
   await pushKeyToGas('stocks', curStocks, curVal);
 
-  // ② 翌月の期首データを作成（今月のstock値 → 翌月のprevStock）
+  // ② 翌月の期首データを作成（今月のstock値 → 翌月のprevStock のみ。stockはセットしない）
   const nextKey = 'ls_stocks_' + nextVal.replace('/', '-');
   const existingNext = JSON.parse(localStorage.getItem(nextKey) || '{}');
   Object.keys(curStocks).forEach(id => {
     const s = curStocks[id];
     if(!s || s.stock === undefined) return;
-    // 今月の期末在庫(stock)を翌月の期首(prevStock)に引き継ぐ
     if(!existingNext[id]) existingNext[id] = {};
     existingNext[id].prevStock = s.stock;
+    // 当月stockは引き継がない（翌月は0から入力開始）
+    delete existingNext[id].stock;
   });
   localStorage.setItem(nextKey, JSON.stringify(existingNext));
   await pushKeyToGas('stocks', existingNext, nextVal);
 
-  // ③ 月セレクタを翌月に切り替え（GAS同期せずlocalStorageから読む）
+  // ③ 月セレクタを翌月に切り替え
   let opt = Array.from(sel.options).find(o => o.value === nextVal);
   if(!opt) {
     opt = document.createElement('option');
@@ -2010,8 +2011,8 @@ async function startNextMonth() {
   }
   sel.value = nextVal;
 
-  // ④ グローバル変数を翌月データに更新（changeMonthは呼ばない）
-  stocks = nextStocks;
+  // ④ グローバル変数を翌月データに更新（nextStocksはここで正しく読み込む）
+  stocks = JSON.parse(localStorage.getItem(nextKey) || '{}');
   shiireData = loadLS(shiireKey(nextVal), []);
   airegiData = loadLS(airegiKey(nextVal), null);
   // 翌月の固定費がなければ今月から引き継ぐ
@@ -2037,33 +2038,48 @@ async function confirmMonthEnd() {
   if(entered === 0) { showToast('棚卸データがありません'); return; }
   if(!confirm(`${month} の棚卸を確定して\n翌月の期首在庫に引き継ぎますか？\n\n入力済み品目: ${entered}品目`)) return;
 
-  // 現在の在庫数を prevStock として保存
-  Object.keys(stocks).forEach(id => {
-    if(stocks[id] && stocks[id].stock !== undefined) {
-      stocks[id].prevStock = stocks[id].stock;
-    }
-  });
+  // 今月のstocksはそのまま保存（prevStockは書き換えない＝今月の期首・当月が壊れない）
   saveLS(stocksKey(), stocks);
-  await pushKeyToGas('stocks', stocks); // 今月をGASに保存
+  await pushKeyToGas('stocks', stocks);
 
-  // 翌月の期首（prevStock）も更新
+  // ── 期末金額スナップショットをシート別に保存 ──────────────────
+  // 確定時点の単価（stocks[id].price ?? item.price）で金額確定
+  const endSnap = { total: 0, bySheet: {} };
+  SHEETS.forEach(sh => {
+    let shTotal = 0;
+    sh.items.forEach(item => {
+      const s = stocks[item.id];
+      if(s && s.stock !== undefined && s.stock > 0) {
+        shTotal += calcItemAmount(item, s.stock);
+      }
+    });
+    endSnap.bySheet[sh.id] = shTotal;
+    endSnap.total += shTotal;
+  });
+  // 今月の期末スナップとして保存
+  localStorage.setItem('ls_tana_snap_' + month.replace('/', '-'), JSON.stringify(endSnap));
+  // 翌月の期首スナップとしても同じ値を保存
   const [y, m] = month.split('/').map(Number);
   const nextM = m === 12 ? 1 : m + 1;
   const nextY = m === 12 ? y + 1 : y;
   const nextVal = `${nextY}/${String(nextM).padStart(2,'0')}`;
+  localStorage.setItem('ls_prev_snap_' + nextVal.replace('/', '-'), JSON.stringify(endSnap));
+
+  // 翌月の期首（prevStock数量）を別キーに保存（今月のstockデータは触らない）
   const nextKey = 'ls_stocks_' + nextVal.replace('/', '-');
   const nextStocks = JSON.parse(localStorage.getItem(nextKey) || '{}');
-  // 今月のstockを翌月のprevStockとして上書き
+  // 今月のstock → 翌月のprevStockに。翌月のstockは削除（0から入力）
   Object.keys(stocks).forEach(id => {
     if(stocks[id] && stocks[id].stock !== undefined) {
       if(!nextStocks[id]) nextStocks[id] = {};
       nextStocks[id].prevStock = stocks[id].stock;
+      delete nextStocks[id].stock;
     }
   });
   localStorage.setItem(nextKey, JSON.stringify(nextStocks));
-  await pushKeyToGas('stocks', nextStocks, nextVal); // 翌月もGASに保存
+  await pushKeyToGas('stocks', nextStocks, nextVal);
 
-  // 月次スナップショット
+  // 月次スナップショット（GAS用）
   const gasUrl = getGasUrl();
   if(gasUrl) saveMonthSnapshot().catch(e => console.warn(e));
 
@@ -2100,8 +2116,14 @@ const DEFAULT_FIXED_COSTS = [
 
 let fixedCosts = loadLS(fixedKey(), JSON.parse(JSON.stringify(DEFAULT_FIXED_COSTS)));
 
-// 期首在庫合計（prevStock × 単価）
+// 期首在庫合計：確定時スナップショットがあればそれを使い、なければ数量×現単価で計算
 function calcPrevTotal() {
+  const month = document.getElementById('monthSel')?.value || '';
+  const snapRaw = localStorage.getItem('ls_prev_snap_' + month.replace('/', '-'));
+  if(snapRaw) {
+    try { return JSON.parse(snapRaw).total || 0; } catch(_) {}
+  }
+  // スナップなし：数量×現単価（フォールバック）
   let total = 0;
   SHEETS.forEach(sh => sh.items.forEach(item => {
     const s = stocks[item.id];
@@ -2110,6 +2132,24 @@ function calcPrevTotal() {
     }
   }));
   return total;
+}
+
+// シート別期首：スナップショット優先
+function calcPrevBySheetIdSnap(sheetId) {
+  const month = document.getElementById('monthSel')?.value || '';
+  const snapRaw = localStorage.getItem('ls_prev_snap_' + month.replace('/', '-'));
+  if(snapRaw) {
+    try {
+      const snap = JSON.parse(snapRaw);
+      if(snap.bySheet && snap.bySheet[sheetId] !== undefined) return snap.bySheet[sheetId];
+    } catch(_) {}
+  }
+  // フォールバック：数量×現単価
+  const sh = SHEETS.find(s => s.id === sheetId); if(!sh) return 0;
+  return sh.items.reduce((s, item) => {
+    const st = stocks[item.id];
+    return s + (st && st.prevStock !== undefined ? calcItemAmount(item, st.prevStock) : 0);
+  }, 0);
 }
 
 function renderMonthly() {
@@ -2164,13 +2204,7 @@ function renderMonthly() {
       return s + (st && st.stock !== undefined ? calcItemAmount(item, st.stock) : 0);
     }, 0);
   };
-  const calcPrevBySheetId = (sheetId) => {
-    const sh = SHEETS.find(s => s.id === sheetId); if(!sh) return 0;
-    return sh.items.reduce((s,item) => {
-      const st = stocks[item.id];
-      return s + (st && st.prevStock !== undefined ? calcItemAmount(item, st.prevStock) : 0);
-    }, 0);
-  };
+  const calcPrevBySheetId = (sheetId) => calcPrevBySheetIdSnap(sheetId);
   const tana_food  = calcSheetTotalById('darumaya') + calcSheetTotalById('hirata_food');
   const tana_pack  = calcSheetTotalById('hozai');
   const tana_shomou= calcSheetTotalById('shomou');
