@@ -2957,36 +2957,46 @@ function splitHirataCSVLine(line) {
 }
 
 function renderHirataPreview() {
-  const totalAmt = _hirataInvoices.reduce((s,inv) => s + inv.items.reduce((ss,it)=>ss+it.amount,0), 0);
-  const totalItems = _hirataInvoices.reduce((s,inv) => s + inv.items.length, 0);
-  const unmatch = _hirataInvoices.reduce((s,inv) => s + inv.items.filter(it=>!it._master).length, 0);
+  const totalAmt  = _hirataInvoices.reduce((s,inv) => s + inv.items.reduce((ss,it)=>ss+it.amount,0), 0);
+  const totalItems= _hirataInvoices.reduce((s,inv) => s + inv.items.length, 0);
+  const unmatch   = _hirataInvoices.reduce((s,inv) => s + inv.items.filter(it=>!it._master).length, 0);
+  const priceChg  = _hirataInvoices.reduce((s,inv) => s + inv.items.filter(it=>it._priceChanged).length, 0);
 
   document.getElementById('hirataPreviewTitle').textContent =
     `${_hirataInvoices.length}伝票 / ${totalItems}品目 を読み込みました`;
+
   const uEl = document.getElementById('hirataUnmatch');
-  if(unmatch > 0) { uEl.textContent = `⚠️ マスタ未照合 ${unmatch}件`; uEl.style.display='inline'; }
-  else uEl.style.display = 'none';
+  const badges = [];
+  if(unmatch  > 0) badges.push(`⚠️ 未照合 ${unmatch}件`);
+  if(priceChg > 0) badges.push(`💰 単価変更 ${priceChg}件`);
+  if(badges.length) { uEl.textContent = badges.join('　'); uEl.style.display='inline'; }
+  else { uEl.style.display='none'; }
+
   document.getElementById('hirataPreviewTotal').textContent = yen(totalAmt);
   document.getElementById('hirataPreviewCount').textContent = `伝票${_hirataInvoices.length}枚`;
 
   document.getElementById('hirataInvoiceList').innerHTML = _hirataInvoices.map((inv, gi) => {
-    const invTotal = inv.items.reduce((s,it)=>s+it.amount,0);
-    const dateDisp = inv.date.replace(/-/g,'/');
+    const invTotal  = inv.items.reduce((s,it)=>s+it.amount,0);
+    const invUnmatch= inv.items.filter(it=>!it._master).length;
+    const invChg    = inv.items.filter(it=>it._priceChanged).length;
+    const dateDisp  = inv.date.replace(/-/g,'/');
     return `<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:6px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)">${dateDisp}</span>
           <span style="font-size:11px;font-weight:700;color:var(--text)">伝票 #${inv.invNo||'—'}</span>
           <span style="font-size:10px;color:var(--text3)">${inv.items.length}品目</span>
+          ${invUnmatch>0 ? `<span style="font-size:10px;color:var(--red);font-weight:700;background:#fff5f5;padding:2px 7px;border-radius:20px;border:1px solid #f5c8c0">⚠️ 未照合 ${invUnmatch}件</span>` : ''}
+          ${invChg>0    ? `<span style="font-size:10px;color:#7a5a0a;font-weight:700;background:var(--yellow-l);padding:2px 7px;border-radius:20px;border:1px solid #f0d070">💰 単価変更 ${invChg}件</span>` : ''}
         </div>
         <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--accent2)">${yen(invTotal)}</span>
       </div>
       <div style="overflow-x:auto">
-        <table class="edit-table" style="min-width:420px">
+        <table class="edit-table" style="min-width:500px">
           <thead><tr>
-            <th>商品名</th>
-            <th style="text-align:center;width:60px">数量</th>
-            <th style="text-align:right;width:80px">単価</th>
+            <th>商品名 / マスタ照合</th>
+            <th style="text-align:center;width:65px">数量</th>
+            <th style="text-align:right;width:85px">単価</th>
             <th style="text-align:right;width:80px">金額</th>
             <th style="width:75px">分類</th>
             <th style="width:30px"></th>
@@ -2995,16 +3005,38 @@ function renderHirataPreview() {
             ${inv.items.map((it, ii) => {
               const noM = !it._master;
               const chg = it._priceChanged;
-              const bg = noM ? 'background:#fff8f8' : chg ? 'background:var(--yellow-l)' : '';
-              return `<tr style="${bg}">
+              // 行の背景色
+              const rowBg = noM  ? 'background:#fff5f5;outline:1.5px solid var(--red);outline-offset:-1px'
+                          : chg  ? 'background:var(--yellow-l);outline:1px solid #e8c840;outline-offset:-1px'
+                          : '';
+              // マスタ照合ステータス表示
+              const matchBadge = noM
+                ? `<div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
+                     <span style="font-size:10px;color:var(--red);font-weight:700">⚠️ マスタ未照合</span>
+                     <button onclick="hirataAddToMaster(${gi},${ii})"
+                       style="font-size:10px;padding:2px 8px;border-radius:5px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-family:'Noto Sans JP',sans-serif">
+                       ＋ マスタに追加
+                     </button>
+                   </div>`
+                : chg
+                ? `<div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
+                     <span style="font-size:10px;color:var(--accent)">✓ ${it._master.name}</span>
+                     <span style="font-size:10px;color:var(--red);font-weight:700">
+                       ¥${it._masterPrice.toLocaleString()} → ¥${it.unitPrice.toLocaleString()}
+                     </span>
+                     <button onclick="hirataUpdatePrice(${gi},${ii})"
+                       style="font-size:10px;padding:2px 8px;border-radius:5px;border:none;background:var(--yellow);color:#fff;cursor:pointer;font-family:'Noto Sans JP',sans-serif">
+                       単価を更新
+                     </button>
+                   </div>`
+                : `<div style="font-size:10px;color:var(--accent);margin-top:2px">✓ ${it._master.name}</div>`;
+              return `<tr id="hrow-${gi}-${ii}" style="${rowBg}">
                 <td>
-                  <div style="font-size:12px;color:var(--text);margin-bottom:${noM?'2':'0'}px">${it.name}</div>
-                  ${noM ? `<div style="font-size:10px;color:var(--red)">⚠️ マスタ未照合</div>` :
-                           `<div style="font-size:10px;color:var(--accent)">✓ ${it._master.name}</div>`}
-                  ${chg ? `<div style="font-size:10px;color:var(--red)">単価変更: ¥${it._masterPrice.toLocaleString()} → ¥${it.unitPrice.toLocaleString()}</div>` : ''}
+                  <div style="font-size:12px;color:var(--text);font-weight:500">${it.name}</div>
+                  ${matchBadge}
                 </td>
                 <td style="text-align:center;font-family:'DM Mono',monospace;font-size:12px">${it.qty} ${it.unit}</td>
-                <td style="text-align:right;font-family:'DM Mono',monospace;font-size:12px">¥${it.unitPrice.toLocaleString()}</td>
+                <td style="text-align:right;font-family:'DM Mono',monospace;font-size:12px;${chg?'color:var(--red);font-weight:700':''}">¥${it.unitPrice.toLocaleString()}</td>
                 <td style="text-align:right;font-family:'DM Mono',monospace;font-size:12px;font-weight:600">¥${it.amount.toLocaleString()}</td>
                 <td>
                   <select class="cat-sel" style="min-width:65px;font-size:11px"
@@ -3016,7 +3048,7 @@ function renderHirataPreview() {
                 </td>
                 <td style="text-align:center">
                   <button onclick="_hirataInvoices[${gi}].items.splice(${ii},1);if(_hirataInvoices[${gi}].items.length===0)_hirataInvoices.splice(${gi},1);renderHirataPreview()"
-                    style="background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:2px 4px">×</button>
+                    style="background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:2px 4px" title="この行を除外">×</button>
                 </td>
               </tr>`;
             }).join('')}
@@ -3030,16 +3062,118 @@ function renderHirataPreview() {
   document.getElementById('hirataPreview').scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
+// ── 品目ごと：単価をマスタに反映 ──────────────────────────────
+function hirataUpdatePrice(gi, ii) {
+  const it = _hirataInvoices[gi].items[ii];
+  if(!it || !it._master) return;
+  const oldP = it._masterPrice;
+  const newP = it.unitPrice;
+  const diff = newP - oldP;
+  const diffStr = diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString();
+
+  if(!confirm(
+    `【単価変更の確認】\n\n` +
+    `品目: ${it._master.name}\n` +
+    `現在: ¥${oldP.toLocaleString()}\n` +
+    `変更後: ¥${newP.toLocaleString()}（${diffStr}）\n\n` +
+    `品目マスタの単価を更新しますか？\n※ 棚卸の計算にも反映されます`
+  )) return;
+
+  // マスタを更新
+  it._master.prevPrice = it._master.price;
+  it._master.price = newP;
+  saveLS('ls_sheets', SHEETS);
+  if(typeof pushKeyToGas === 'function') pushKeyToGas('sheets', SHEETS);
+
+  // プレビュー上のフラグを解除して再描画
+  it._masterPrice = newP;
+  it._priceChanged = false;
+  renderHirataPreview();
+  showToast(`✓ 「${it._master.name}」の単価を ¥${newP.toLocaleString()} に更新しました`);
+}
+
+// ── 品目ごと：未照合 → マスタに追加 ──────────────────────────
+function hirataAddToMaster(gi, ii) {
+  const it = _hirataInvoices[gi].items[ii];
+  if(!it || it._master) return;
+
+  // どのシートに追加するか選ばせる
+  const sheetNames = SHEETS.map((sh,i) => `${i+1}. ${sh.name}`).join('\n');
+  const sheetInput = prompt(
+    `【マスタに追加】\n\n` +
+    `品目名: ${it.name}\n` +
+    `単価: ¥${it.unitPrice.toLocaleString()} / ${it.unit}\n` +
+    `分類: ${it.category}\n\n` +
+    `追加するシートの番号を入力してください:\n${sheetNames}`,
+    it.category === '包材' ? '2' : '1'
+  );
+  if(sheetInput === null) return; // キャンセル
+
+  const shIdx = parseInt(sheetInput) - 1;
+  if(isNaN(shIdx) || shIdx < 0 || shIdx >= SHEETS.length) {
+    showToast('⚠️ 有効なシート番号を入力してください'); return;
+  }
+
+  if(!confirm(
+    `「${it.name}」を\n「${SHEETS[shIdx].name}」シートに追加します。\n\n` +
+    `単価: ¥${it.unitPrice.toLocaleString()} / ${it.unit}\n\nよろしいですか？`
+  )) return;
+
+  const newId = 'u' + Date.now();
+  SHEETS[shIdx].items.push({
+    id: newId, name: it.name,
+    unit: it.unit, price: it.unitPrice, prevPrice: it.unitPrice,
+    qty: null, tanaUnit: null, unitLabel: null
+  });
+  saveLS('ls_sheets', SHEETS);
+  if(typeof pushKeyToGas === 'function') pushKeyToGas('sheets', SHEETS);
+
+  // 照合フラグを更新して再描画
+  const master = SHEETS[shIdx].items.find(m => m.id === newId);
+  it._master = master;
+  it._masterPrice = master.price;
+  it._priceChanged = false;
+  renderHirataPreview();
+  showToast(`✓ 「${it.name}」を品目マスタに追加しました`);
+}
+
 function closeHirataPreview() {
   _hirataInvoices = [];
   document.getElementById('hirataPreview').style.display = 'none';
 }
 
+// ── 仕入台帳に追加（未処理の単価変更・未照合品を最終確認） ──
 function importHirataRows() {
   if(_hirataInvoices.length === 0) return;
+
+  // 残っている単価変更・未照合を集計してまとめて確認
+  const pendingChg   = [];
+  const pendingUnmatch = [];
+  _hirataInvoices.forEach((inv,gi) => inv.items.forEach((it,ii) => {
+    if(it._priceChanged) pendingChg.push({gi,ii,it});
+    if(!it._master)      pendingUnmatch.push({gi,ii,it});
+  }));
+
+  if(pendingChg.length > 0 || pendingUnmatch.length > 0) {
+    let msg = '仕入台帳に追加する前に確認があります。\n\n';
+    if(pendingChg.length > 0) {
+      msg += `【単価変更 ${pendingChg.length}件】\n`;
+      pendingChg.forEach(p => {
+        msg += `・${p.it.name}  ¥${p.it._masterPrice.toLocaleString()} → ¥${p.it.unitPrice.toLocaleString()}\n`;
+      });
+      msg += '\n';
+    }
+    if(pendingUnmatch.length > 0) {
+      msg += `【マスタ未照合 ${pendingUnmatch.length}件】\n`;
+      pendingUnmatch.forEach(p => { msg += `・${p.it.name}\n`; });
+      msg += '\n';
+    }
+    msg += 'このまま仕入台帳に追加しますか？\n（「キャンセル」するとプレビューに戻ります）';
+    if(!confirm(msg)) return;
+  }
+
   const records = loadLS(shiireKey(), []);
   let addedCount = 0, totalAmt = 0;
-
   _hirataInvoices.forEach(inv => {
     inv.items.forEach(it => {
       if(!it.amount) return;
