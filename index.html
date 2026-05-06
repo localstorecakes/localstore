@@ -3923,19 +3923,27 @@ function importLocalData(input) {
 (function initMonthSel(){
   const sel=document.getElementById('monthSel');
   if(!sel)return;
-  const now=new Date();
   sel.innerHTML='';
-  // アプリ開始月（2026年2月）より前は表示しない
-  const startYear=2026, startMonth=1;
-  for(let i=0;i<6;i++){
-    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    if(d.getFullYear()<startYear||(d.getFullYear()===startYear&&d.getMonth()+1<startMonth)) break;
-    const val=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  // localStorageにデータがある月のみ表示
+  const months=new Set();
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    const m=k.match(/^ls_(?:stocks|shiire|airegi|fixed|freee)_(\d{4}-\d{2})$/);
+    if(m) months.add(m[1].replace('-','/'));
+  }
+  // 現在月は必ず含める
+  const now=new Date();
+  const curVal=`${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}`;
+  months.add(curVal);
+  // 降順ソートして追加
+  const sorted=[...months].sort((a,b)=>b.localeCompare(a));
+  sorted.forEach((val,i)=>{
+    const [y,m]=val.split('/');
     const opt=document.createElement('option');
-    opt.value=val;opt.textContent=`${d.getFullYear()}年${d.getMonth()+1}月`;
+    opt.value=val;opt.textContent=`${y}年${parseInt(m)}月`;
     if(i===0)opt.selected=true;
     sel.appendChild(opt);
-  }
+  });
 })();
 
 updateSyncStatus();
