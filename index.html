@@ -2422,6 +2422,7 @@ function saveFixedCost() {
     fixedCosts.push({ id:'fc'+Date.now(), name, amount });
   }
   saveLS(fixedKey(), fixedCosts);
+  pushKeyToGas('fixed', fixedCosts);
   closeFixedCostModal();
   renderFixedCostRows();
   showToast(editId ? '✓ 更新しました' : '✓ 追加しました');
@@ -2430,6 +2431,7 @@ function deleteFixedCost(id) {
   if(!confirm('この項目を削除しますか？')) return;
   fixedCosts = fixedCosts.filter(r=>r.id!==id);
   saveLS(fixedKey(), fixedCosts);
+  pushKeyToGas('fixed', fixedCosts);
   renderFixedCostRows();
   showToast('削除しました');
 }
