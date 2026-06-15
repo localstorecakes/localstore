@@ -618,7 +618,10 @@ tr.highlight td{background:rgba(74,110,60,.04) !important}
     <div class="card">
       <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
         <span>今月のキャッシュフロー</span>
-        <button class="btn btn-primary btn-sm" onclick="openFixedCostModal()">＋ 項目追加</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sec btn-sm" onclick="inheritLastMonthFixed()">先月を引継ぎ</button>
+          <button class="btn btn-primary btn-sm" onclick="openFixedCostModal()">＋ 項目追加</button>
+        </div>
       </div>
       <div id="fixedCostRows"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;border-top:1px solid var(--border);margin-top:4px">
@@ -2427,6 +2430,27 @@ function saveFixedCost() {
   renderFixedCostRows();
   showToast(editId ? '✓ 更新しました' : '✓ 追加しました');
 }
+function inheritLastMonthFixed() {
+  const cur = document.getElementById('monthSel')?.value;
+  if(!cur) return;
+  const [y, m] = cur.split('/').map(Number);
+  const prevM = m === 1 ? 12 : m - 1;
+  const prevY = m === 1 ? y - 1 : y;
+  const prevVal = `${prevY}/${String(prevM).padStart(2,'0')}`;
+  const prevKey = 'ls_fixed_' + prevVal.replace('/', '-');
+  const prevData = JSON.parse(localStorage.getItem(prevKey) || '[]');
+  if(prevData.length === 0) { showToast('先月のデータがありません'); return; }
+  if(fixedCosts.length > 0) {
+    if(!confirm(`現在の項目（${fixedCosts.length}件）を先月（${prevY}年${prevM}月）の項目で上書きします。よろしいですか？`)) return;
+  }
+  // IDを新規発行して引き継ぎ（金額はそのままコピー）
+  fixedCosts = prevData.map(r => ({...r, id:'fc'+Date.now()+Math.random()}));
+  saveLS(fixedKey(), fixedCosts);
+  pushKeyToGas('fixed', fixedCosts);
+  renderFixedCostRows();
+  showToast(`✓ ${prevY}年${prevM}月の項目（${fixedCosts.length}件）を引き継ぎました`);
+}
+
 function deleteFixedCost(id) {
   if(!confirm('この項目を削除しますか？')) return;
   fixedCosts = fixedCosts.filter(r=>r.id!==id);
